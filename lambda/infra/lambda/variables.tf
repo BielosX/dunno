@@ -19,3 +19,8 @@ variable "handler" {
   type    = string
   default = "dummy"
 }
+
+variable "snap_start" {
+  type = bool
+  default = false
+}

@@ -42,4 +42,10 @@ resource "aws_lambda_function" "lambda" {
   tags = {
     language = var.language
   }
+  dynamic "snap_start" {
+    for_each = var.snap_start ? [1] : []
+    content {
+      apply_on = "PublishedVersions"
+    }
+  }
 }

@@ -18,13 +18,14 @@ artifacts-destroy:
     {{tf-bin}} destroy -auto-approve
 
 [working-directory: "infra/lambda"]
-lambda-apply language handler bucket bucket_key count:
+lambda-apply language handler bucket bucket_key count snap_start="false":
     {{tf-bin}} init && {{tf-bin}} apply -auto-approve \
         -var="handler={{handler}}" \
         -var="language={{language}}" \
         -var="bucket={{bucket}}" \
         -var="bucket_key={{bucket_key}}" \
-        -var="lambda_count={{count}}"
+        -var="lambda_count={{count}}" \
+        -var="snap_start={{snap_start}}"
 
 [working-directory: "golang"]
 golang-build:
@@ -48,7 +49,7 @@ java-zip: java-clean
     ./gradlew buildZip
 
 
-deploy-lambda language:
+deploy-lambda language snap_start="false":
     #!/bin/bash -e
     just artifacts-apply
     bucket=$(just artifacts-bucket)
@@ -64,7 +65,7 @@ deploy-lambda language:
       "java")
         just java-zip
         {{aws-cli}} s3 cp java/build/distributions/dunno.zip "s3://${bucket}/${bucket_key}"
-        just lambda-apply "java" "org.dunno.Handler" "${bucket}" "${bucket_key}" "{{lambda-count}}"
+        just lambda-apply "java" "org.dunno.Handler" "${bucket}" "${bucket_key}" "{{lambda-count}}" "{{snap_start}}"
         ;;
       *)
         echo "Wrong language name"
