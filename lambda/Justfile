@@ -1,5 +1,7 @@
 region := env("AWS_REGION", "eu-central-1")
 tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+lambda-count := "10"
 
 export AWS_REGION := region
 
@@ -8,13 +10,48 @@ artifacts-apply:
     {{tf-bin}} init && {{tf-bin}} apply -auto-approve
 
 [working-directory: "infra/artifacts"]
+artifacts-bucket:
+    {{tf-bin}} output -raw bucket_name
+
+[working-directory: "infra/artifacts"]
 artifacts-destroy:
     {{tf-bin}} destroy -auto-approve
+
+[working-directory: "infra/lambda"]
+lambda-apply language bucket bucket_key count:
+    {{tf-bin}} init && {{tf-bin}} apply -auto-approve \
+        -var="language={{language}}" \
+        -var="bucket={{bucket}}" \
+        -var="bucket_key={{bucket_key}}" \
+        -var="lambda_count={{count}}"
 
 [working-directory: "golang"]
 golang-build:
     GOOS=linux GOARCH=arm64 go build -o dunno main.go
 
 [working-directory: "golang"]
+golang-zip: golang-build
+    zip dunno.zip dunno
+
+[working-directory: "golang"]
 golang-clean:
     rm -f dunno
+    rm -f *.zip
+
+deploy-lambda language:
+    #!/bin/bash -e
+    just artifacts-apply
+    bucket=$(just artifacts-bucket)
+    timestamp=$(date +%s)
+    bucket_key="dunno-${timestamp}.zip"
+    case "{{language}}" in
+      "golang")
+        just golang-clean
+        just golang-zip
+        {{aws-cli}} s3 cp golang/dunno.zip "s3://${bucket}/${bucket_key}"
+        just lambda-apply "golang" "${bucket}" "${bucket_key}" "{{lambda-count}}"
+        ;;
+      *)
+        echo "Wrong language name"
+        ;;
+    esac
