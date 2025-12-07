@@ -4,15 +4,18 @@ variable "lambda_count" {
 }
 
 variable "language" {
-  type = string
+  type    = string
+  default = "golang"
 }
 
 variable "bucket" {
-  type = string
+  type    = string
+  default = "dummy"
 }
 
 variable "bucket_key" {
-  type = string
+  type    = string
+  default = "dummy.zip"
 }
 
 variable "handler" {
