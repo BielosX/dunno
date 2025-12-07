@@ -34,7 +34,7 @@ resource "aws_lambda_function" "lambda" {
   role          = aws_iam_role.role.arn
   handler       = var.handler
   package_type  = "Zip"
-  memory_size   = 512
+  memory_size   = 1769 // 1vCPU
   timeout       = 30
   runtime       = local.runtimes[var.language]
   s3_bucket     = var.bucket

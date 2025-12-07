@@ -21,6 +21,6 @@ variable "handler" {
 }
 
 variable "snap_start" {
-  type = bool
+  type    = bool
   default = false
 }
