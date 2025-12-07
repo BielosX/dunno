@@ -1,7 +1,7 @@
 region := env("AWS_REGION", "eu-central-1")
 tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
 aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
-lambda-count := "10"
+lambda-count := env("LAMBDA_COUNT", "1")
 
 export AWS_REGION := region
 
