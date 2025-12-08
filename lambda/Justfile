@@ -62,7 +62,8 @@ python-zip: python-clean
     zip dunno.zip main.py
 
 snapstart-status name:
-    {{aws-cli}} lambda get-function-configuration --function-name "{{name}}" | jq -r '.SnapStart'
+    {{aws-cli}} lambda get-function-configuration --function-name "{{name}}" \
+        | jq -r '{SnapStart: .SnapStart, State: .State}'
 
 deploy-lambda language snap_start="false":
     #!/bin/bash -e
