@@ -39,7 +39,8 @@ resource "aws_lambda_function" "lambda" {
   runtime       = local.runtimes[var.language]
   s3_bucket     = var.bucket
   s3_key        = var.bucket_key
-  architectures = ["arm64"]
+  architectures = [var.architecture]
+  publish       = true # Required for SnapStart
   tags = {
     language = var.language
   }
