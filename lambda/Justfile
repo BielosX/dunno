@@ -27,17 +27,21 @@ lambda-apply language handler bucket bucket_key count snap_start="false":
         -var="lambda_count={{count}}" \
         -var="snap_start={{snap_start}}"
 
+[working-directory: "infra/lambda"]
+lambda-destroy:
+    {{tf-bin}} destroy -auto-approve
+
 [working-directory: "golang"]
 golang-build:
-    GOOS=linux GOARCH=arm64 go build -o dunno main.go
+    GOOS=linux GOARCH=arm64 go build -o bootstrap main.go
 
 [working-directory: "golang"]
 golang-zip: golang-build
-    zip dunno.zip dunno
+    zip dunno.zip bootstrap
 
 [working-directory: "golang"]
 golang-clean:
-    rm -f dunno
+    rm -f bootstrap
     rm -f *.zip
 
 [working-directory: "java"]
