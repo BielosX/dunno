@@ -8,13 +8,14 @@ import (
 	"github.com/aws/aws-lambda-go/lambdacontext"
 )
 
-func handle(ctx context.Context) {
+func handle(ctx context.Context) (string, error) {
 	lc, _ := lambdacontext.FromContext(ctx)
 	slog.Info("Lambda Handler",
 		"RequestID",
 		lc.AwsRequestID,
 		"FunctionArn",
 		lc.InvokedFunctionArn)
+	return lambdacontext.LogStreamName, nil
 }
 
 func main() {

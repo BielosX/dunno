@@ -10,6 +10,6 @@ public class Handler implements RequestHandler<Void, String> {
     System.out.printf(
         "AwsRequestId: %s, FunctionArn: %s",
         context.getAwsRequestId(), context.getInvokedFunctionArn());
-    return "OK";
+    return context.getLogStreamName();
   }
 }

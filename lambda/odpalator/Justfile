@@ -1,0 +1,8 @@
+build:
+    go build -o odpalator main.go
+
+clean:
+    rm -f odpalator
+
+fmt:
+    gofmt -w .
