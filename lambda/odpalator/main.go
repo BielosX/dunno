@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -95,7 +95,11 @@ func invokeFunction(ctx context.Context, language, functionName, logGroup, arn *
 	if err != nil {
 		return nil, err
 	}
-	logStreamName := strings.ReplaceAll(string(invokeOut.Payload[:]), `"`, "")
+	var logStreamName string
+	err = json.Unmarshal(invokeOut.Payload, &logStreamName)
+	if err != nil {
+		return nil, err
+	}
 	var startupDuration *float64
 	for startupDuration == nil {
 		startupDuration, err = getStartupDuration(ctx, logGroup, &logStreamName)
