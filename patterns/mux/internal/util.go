@@ -2,11 +2,16 @@ package internal
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
+	"strconv"
+	"strings"
 
+	dynamoTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gorilla/mux"
 )
 
@@ -27,6 +32,45 @@ type Unit struct{}
 
 type PathParams struct{}
 type QueryParams struct{}
+
+func DecodeLastEvaluatedKey(key string) (map[string]dynamoTypes.AttributeValue, error) {
+	decoded, err := io.ReadAll(base64.NewDecoder(base64.RawURLEncoding, strings.NewReader(key)))
+	if err != nil {
+		return nil, err
+	}
+	var lastEvaluatedKey map[string]dynamoTypes.AttributeValue
+	err = json.Unmarshal(decoded, &lastEvaluatedKey)
+	if err != nil {
+		return nil, err
+	}
+	return lastEvaluatedKey, nil
+}
+
+func ParseInt32(s string) (*int32, error) {
+	i, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return nil, err
+	}
+	value := int32(i)
+	return &value, nil
+}
+
+func EncodeLastEvaluatedKey(key map[string]dynamoTypes.AttributeValue) (string, error) {
+	result, err := json.Marshal(key)
+	if err != nil {
+		return "", err
+	}
+	encoded := base64.RawURLEncoding.EncodeToString(result)
+	return encoded, nil
+}
+
+func GetQueryParam[T any](r *Request[T], key string) string {
+	value, ok := r.QueryParams[key]
+	if !ok {
+		return ""
+	}
+	return value[0]
+}
 
 func ErrorResponse[T any](err error, statusCode int) *Response[T] {
 	message := err.Error()

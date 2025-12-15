@@ -18,7 +18,8 @@ data "aws_iam_policy_document" "dynamodb" {
     effect = "Allow"
     actions = [
       "dynamodb:GetItem",
-      "dynamodb:PutItem"
+      "dynamodb:PutItem",
+      "dynamodb:Scan"
     ]
     resources = [aws_dynamodb_table.table.arn]
   }

@@ -28,6 +28,11 @@ type BookRequest struct {
 	Pages   int      `json:"pages"`
 }
 
+type ListBooksResponse struct {
+	Books            []BookResponse `json:"books"`
+	LastEvaluatedKey *string        `json:"lastEvaluatedKey,omitempty"`
+}
+
 const (
 	DynamoDbTag          = "dynamodb"
 	DynamoDbPartitionKey = "partitionKey"
@@ -107,7 +112,69 @@ func SaveBook(r *Request[BookRequest]) *Response[BookResponse] {
 	})
 }
 
+const (
+	lastEvaluatedKeyQueryParam = "LastEvaluatedKey"
+	limitQueryParam            = "limit"
+)
+
+func ListBooks(r *Request[Unit]) *Response[ListBooksResponse] {
+	encodedLastEvaluatedKey := GetQueryParam(r, lastEvaluatedKeyQueryParam)
+	var limit *int32
+	var err error
+	limitStr := GetQueryParam(r, limitQueryParam)
+	if limitStr != "" {
+		limit, err = ParseInt32(limitStr)
+		if err != nil {
+			return ErrorResponse[ListBooksResponse](err, http.StatusInternalServerError)
+		}
+	}
+	var lastEvaluatedKey map[string]types.AttributeValue
+	if encodedLastEvaluatedKey != "" {
+		lastEvaluatedKey, err = DecodeLastEvaluatedKey(encodedLastEvaluatedKey)
+		if err != nil {
+			return ErrorResponse[ListBooksResponse](err, http.StatusInternalServerError)
+		}
+	}
+	out, err := global.DynamoDBClient.Scan(r.Context, &dynamodb.ScanInput{
+		Limit:             limit,
+		TableName:         aws.String(global.AppConfig.BooksTableArn),
+		ExclusiveStartKey: lastEvaluatedKey,
+	})
+	if err != nil {
+		return ErrorResponse[ListBooksResponse](err, http.StatusInternalServerError)
+	}
+	lastEvaluatedKey = out.LastEvaluatedKey
+	var lastEvaluatedKeyPtr *string
+	if out.LastEvaluatedKey != nil {
+		result, err := EncodeLastEvaluatedKey(lastEvaluatedKey)
+		if err != nil {
+			return ErrorResponse[ListBooksResponse](err, http.StatusInternalServerError)
+		}
+		lastEvaluatedKeyPtr = &result
+	}
+	var books []BookRecord
+	err = attributevalue.UnmarshalListOfMaps(out.Items, &books)
+	if err != nil {
+		return ErrorResponse[ListBooksResponse](err, http.StatusInternalServerError)
+	}
+	var items []BookResponse
+	for _, book := range books {
+		items = append(items, BookResponse{
+			Id:      book.Id,
+			Title:   book.Title,
+			ISBN:    book.ISBN,
+			Authors: book.Authors,
+			Pages:   book.Pages,
+		})
+	}
+	return SuccessResponse(&ListBooksResponse{
+		Books:            items,
+		LastEvaluatedKey: lastEvaluatedKeyPtr,
+	})
+}
+
 func init() {
 	RegisterFunc(global.Router, "/books/{id}", "GET", GetBook)
+	RegisterFunc(global.Router, "/books", "GET", ListBooks)
 	RegisterFuncMatchContentType(global.Router, "/books", "POST", SaveBook, "application/json")
 }
