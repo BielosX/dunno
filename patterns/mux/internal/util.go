@@ -80,6 +80,10 @@ func ErrorResponse[T any](err error, statusCode int) *Response[T] {
 	}
 }
 
+func ServerError[T any](err error) *Response[T] {
+	return ErrorResponse[T](err, http.StatusInternalServerError)
+}
+
 func SuccessResponse[T any](body *T) *Response[T] {
 	return &Response[T]{
 		Body:       body,
