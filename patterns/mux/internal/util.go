@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -10,12 +11,13 @@ import (
 )
 
 type Response[T any] struct {
-	Body         T
+	Body         *T
 	StatusCode   int
 	ErrorMessage *string
 }
 
 type Request[T any] struct {
+	Context     context.Context
 	Body        T
 	PathParams  map[string]string
 	QueryParams map[string][]string
@@ -25,6 +27,46 @@ type Unit struct{}
 
 type PathParams struct{}
 type QueryParams struct{}
+
+func ErrorResponse[T any](err error, statusCode int) *Response[T] {
+	message := err.Error()
+	return &Response[T]{
+		StatusCode:   statusCode,
+		ErrorMessage: &message,
+	}
+}
+
+func SuccessResponse[T any](body *T) *Response[T] {
+	return &Response[T]{
+		Body:       body,
+		StatusCode: http.StatusOK,
+	}
+}
+
+func NotFoundResponse[T any]() *Response[T] {
+	return &Response[T]{
+		StatusCode: http.StatusNotFound,
+	}
+}
+
+func GetFieldsByTagValue(s any, tag, value string) []reflect.StructField {
+	t := reflect.TypeOf(s)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil
+	}
+	var fields []reflect.StructField
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		tagValue, ok := f.Tag.Lookup(tag)
+		if ok && tagValue == value {
+			fields = append(fields, f)
+		}
+	}
+	return fields
+}
 
 func WithPathParams(r *http.Request, params map[string]string) *http.Request {
 	ctx := context.WithValue(r.Context(), PathParams{}, params)
@@ -46,26 +88,35 @@ func GetQueryParams(r *http.Request) map[string][]string {
 
 func RegisterFunc[I any, O any](router *mux.Router,
 	path, method string,
-	handler func(request *Request[I]) Response[O]) *mux.Route {
+	handler func(request *Request[I]) *Response[O]) *mux.Route {
 	return router.HandleFunc(path, toHandleFunc(handler)).Methods(method)
+}
+
+func RegisterFuncMatchContentType[I any, O any](router *mux.Router,
+	path, method string,
+	handler func(request *Request[I]) *Response[O],
+	contentType string) *mux.Route {
+	return RegisterFunc[I, O](router, path, method, handler).Headers("Content-Type", contentType)
 }
 
 func IsUnit(value any) bool {
 	return reflect.TypeOf(value) == reflect.TypeOf(Unit{})
 }
 
-func toHandleFunc[I any, O any](handler func(request *Request[I]) Response[O]) func(http.ResponseWriter, *http.Request) {
+func toHandleFunc[I any, O any](handler func(request *Request[I]) *Response[O]) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body I
 		if !IsUnit(body) {
 			err := json.NewDecoder(r.Body).Decode(&body)
 			if err != nil {
+				err = fmt.Errorf("failed to decode request body: %v", err)
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write([]byte(err.Error()))
 				return
 			}
 		}
 		response := handler(&Request[I]{
+			Context:     r.Context(),
 			Body:        body,
 			PathParams:  GetPathParams(r),
 			QueryParams: GetQueryParams(r),
@@ -82,6 +133,7 @@ func toHandleFunc[I any, O any](handler func(request *Request[I]) Response[O]) f
 		if !IsUnit(response.Body) {
 			responseBody, err := json.Marshal(response.Body)
 			if err != nil {
+				err = fmt.Errorf("failed to encode response body: %v", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				_, _ = w.Write([]byte(err.Error()))
 				return

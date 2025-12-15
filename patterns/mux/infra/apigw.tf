@@ -21,3 +21,9 @@ resource "aws_apigatewayv2_route" "books" {
   route_key = "ANY /books/{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.books.id}"
 }
+
+resource "aws_apigatewayv2_route" "books_root" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "ANY /books"
+  target    = "integrations/${aws_apigatewayv2_integration.books.id}"
+}

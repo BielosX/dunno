@@ -13,6 +13,22 @@ resource "aws_iam_role" "role" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
+data "aws_iam_policy_document" "dynamodb" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem"
+    ]
+    resources = [aws_dynamodb_table.table.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "dynamodb" {
+  policy = data.aws_iam_policy_document.dynamodb.json
+  role   = aws_iam_role.role.id
+}
+
 resource "aws_iam_role_policy_attachment" "attachment" {
   role       = aws_iam_role.role.id
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -29,6 +45,11 @@ resource "aws_lambda_function" "lambda" {
   architectures    = ["arm64"]
   filename         = var.file_name
   source_code_hash = filebase64sha256(var.file_name)
+  environment {
+    variables = {
+      BOOKS_TABLE_ARN = aws_dynamodb_table.table.arn
+    }
+  }
 }
 
 resource "aws_lambda_permission" "apigw_permission" {
