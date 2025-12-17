@@ -1,0 +1,60 @@
+region := env("AWS_REGION", "eu-central-1")
+tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+go-image := "golang:1.25.4-trixie"
+platform := "linux/arm64/v8"
+
+export AWS_REGION := region
+
+build-handler:
+    podman run --platform "{{platform}}" --rm -v "$PWD":/usr/src/dunno -w /usr/src/dunno/handler \
+    -e GOOS=linux -e GOARCH=arm64 \
+    "{{go-image}}" go build -o bootstrap
+
+build-plugin:
+    podman run --platform "{{platform}}" --rm -v "$PWD":/usr/src/dunno -w /usr/src/dunno/plugin \
+    -e GOOS=linux -e GOARCH=arm64 -e CGO_ENABLED=1 \
+    "{{go-image}}" go build -buildmode=plugin -o plugin-bin
+
+[working-directory: "handler"]
+zip-handler: build-handler
+    zip bootstrap.zip bootstrap
+
+[working-directory: "plugin"]
+zip-plugin: build-plugin
+    zip plugin.zip plugin-bin
+
+[working-directory: "infra"]
+deploy: zip-handler zip-plugin
+    {{tf-bin}} init
+    {{tf-bin}} apply -auto-approve \
+        -var="lambda_zip={{justfile_directory()}}/handler/bootstrap.zip" \
+        -var="plugin_zip={{justfile_directory()}}/plugin/plugin.zip"
+
+[working-directory: "infra"]
+destroy:
+    #!/bin/bash -e
+    tmp=$(mktemp)
+    {{tf-bin}} destroy -auto-approve -var="lambda_zip=${tmp}" -var="plugin_zip=${tmp}"
+    rm -f "${tmp}"
+
+[working-directory: "infra"]
+get-url:
+    #!/bin/bash
+    id=$({{tf-bin}} output -raw api_id)
+    {{aws-cli}} apigatewayv2 get-api --api-id "${id}" | jq -r '.ApiEndpoint'
+
+call-list-files:
+    #!/bin/bash -xe
+    url=$(just get-url)
+    curl -X GET "${url}"
+
+call-upload-file file path:
+    #!/bin/bash -xe
+    url=$(just get-url)
+    curl -X POST --data-binary "@{{file}}" -H "Content-Type: application/octet-stream" "${url}/{{path}}"
+
+call-download-file path:
+    #!/bin/bash -xe
+    url=$(just get-url)
+    curl --output "{{path}}.downloaded" "${url}/{{path}}"
