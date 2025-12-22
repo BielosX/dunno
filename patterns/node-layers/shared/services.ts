@@ -13,6 +13,7 @@ import {
   LambdaClient,
 } from "@aws-sdk/client-lambda";
 import { parse } from "@aws-sdk/util-arn-parser";
+import { logger } from "@shared/logger";
 
 export const uploadS3File = async (
   client: S3Client,
@@ -20,7 +21,7 @@ export const uploadS3File = async (
   key: string,
   body: Uint8Array,
 ) => {
-  console.info(`Uploading: ${[bucket, key]}`);
+  logger.info(`Uploading: ${[bucket, key]}`);
   const input: PutObjectCommandInput = {
     Bucket: bucket,
     Key: key,
@@ -36,7 +37,7 @@ export const downloadS3File = async (
   bucket: string,
   key: string,
 ): Promise<Uint8Array | undefined> => {
-  console.info(`Downloading: ${[bucket, key]}`);
+  logger.info(`Downloading: ${[bucket, key]}`);
   const input: GetObjectCommandInput = {
     Bucket: bucket,
     Key: key,
@@ -55,24 +56,24 @@ export const zipS3File = async (
   sourceKey: string,
   targetBucket: string,
 ) => {
-  console.info(
+  logger.info(
     `zipS3File called with params: ${[sourceBucket, sourceKey, targetBucket]}`,
   );
   try {
     const file = await downloadS3File(client, sourceBucket, sourceKey);
     if (file !== undefined) {
-      console.info(`File of size ${file.length} downloaded`);
+      logger.info(`File of size ${file.length} downloaded`);
       let zip = new JSZip();
       zip.file(sourceKey, file);
       const buffer = await zip.generateAsync({ type: "uint8array" });
-      console.info(`Uploading file of size ${buffer.length}`);
+      logger.info(`Uploading file of size ${buffer.length}`);
       await uploadS3File(client, targetBucket, `${sourceKey}.zip`, buffer);
-      console.info("Uploaded zip file");
+      logger.info("Uploaded zip file");
     } else {
-      console.warn(`File ${sourceKey} not found.`);
+      logger.warn(`File ${sourceKey} not found.`);
     }
   } catch (e) {
-    console.error(e);
+    logger.error(e);
   }
 };
 
@@ -95,7 +96,7 @@ export const resizeS3File = async (
   sourceKey: string,
   targetBucket: string,
 ) => {
-  console.info(
+  logger.info(
     `resizeS3File called with params: ${[sourceBucket, sourceKey, targetBucket]}`,
   );
   try {
@@ -103,18 +104,18 @@ export const resizeS3File = async (
     if (file !== undefined) {
       const s = sharp(file);
       const meta = await s.metadata();
-      console.info(`Resizing file ${sourceKey} with format ${meta.format}`);
+      logger.info(`Resizing file ${sourceKey} with format ${meta.format}`);
       const buffer: Buffer = await s
         .resize(512, 512)
         .toBuffer({ resolveWithObject: false });
       const array: Uint8Array = new Uint8Array(buffer);
       await uploadS3File(client, targetBucket, sourceKey, array);
-      console.info("Uploaded image file");
+      logger.info("Uploaded image file");
     } else {
-      console.warn(`File ${sourceKey} not found.`);
+      logger.warn(`File ${sourceKey} not found.`);
     }
   } catch (e) {
-    console.error(e);
+    logger.error(e);
   }
   return;
 };

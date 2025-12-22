@@ -23,6 +23,7 @@
     "@aws-sdk/client-s3": "^3.953.0",
     "@aws-sdk/util-arn-parser": "^3.953.0",
     "jszip": "^3.10.1",
+    "pino": "^10.1.0",
     "sharp": "^0.34.5",
     "zod": "^4.2.1"
   }

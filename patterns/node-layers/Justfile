@@ -81,6 +81,6 @@ destroy:
         -var="resizer_zip=$tmp"
     rm -f "$tmp"
 
-deploy-all: delete-layer deploy
+deploy-all: deploy-layer deploy
 
 destroy-all: destroy delete-layer
