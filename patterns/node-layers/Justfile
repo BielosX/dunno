@@ -1,0 +1,86 @@
+region := env("AWS_REGION", "eu-central-1")
+tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+layer-name := "nodejs-shared"
+
+export AWS_REGION := region
+export AWS_PAGER := ""
+
+create-layer-dist:
+    rm -rf dist
+    mkdir -p dist/nodejs
+    cp package.json dist/nodejs
+    cp package-lock.json dist/nodejs
+
+[working-directory: "dist/nodejs"]
+install-prod:
+    npm install --omit=dev --os=linux --cpu=x64
+
+fmt:
+    npx prettier --write ./**/*.ts
+
+[working-directory: "utils"]
+@build-utils:
+    go build -o utils main.go
+
+get-latest-layer-version: build-utils
+    @{{justfile_directory()}}/utils/utils get-latest-layer-version --layer-name "{{layer-name}}"
+
+@delete-layer: build-utils
+    {{justfile_directory()}}/utils/utils delete-layer --layer-name "{{layer-name}}"
+
+build-shared:
+    npm install
+    npm run build:shared
+
+build-archiver:
+    npm install
+    npm run build:archiver
+
+[working-directory: "archiver/dist"]
+zip-archiver: build-archiver
+    zip -r archiver.zip .
+
+build-resizer:
+    npm install
+    npm run build:resizer
+
+[working-directory: "resizer/dist"]
+zip-resizer: build-resizer
+    zip -r resizer.zip .
+
+add-shared: build-shared
+    mkdir -p dist/nodejs/node_modules/@shared
+    cp shared/dist/* dist/nodejs/node_modules/@shared
+
+[working-directory: "dist"]
+deploy-layer: create-layer-dist install-prod add-shared
+    zip -r layer.zip nodejs
+    {{aws-cli}} lambda publish-layer-version \
+        --layer-name "{{layer-name}}" \
+        --compatible-runtimes "nodejs" \
+        --zip-file fileb://layer.zip
+
+[working-directory: "infra"]
+deploy: zip-archiver zip-resizer
+    #!/bin/bash -e
+    latest_layer=$(just get-latest-layer-version)
+    echo "Using layer: ${latest_layer}"
+    {{tf-bin}} init && tofu apply -auto-approve \
+        -var="layer_arn=${latest_layer}" \
+        -var="archiver_zip={{justfile_directory()}}/archiver/dist/archiver.zip" \
+        -var="resizer_zip={{justfile_directory()}}/resizer/dist/resizer.zip"
+
+[working-directory: "infra"]
+destroy:
+    #!/bin/bash -e
+    tmp=$(mktemp)
+    {{tf-bin}} destroy -auto-approve \
+        -var="layer_arn=arn:aws:lambda:us-east-1:123456789012:layer:my-test-layer:3" \
+        -var="archiver_zip=$tmp" \
+        -var="resizer_zip=$tmp"
+    rm -f "$tmp"
+
+deploy-all: delete-layer deploy
+
+destroy-all: destroy delete-layer
