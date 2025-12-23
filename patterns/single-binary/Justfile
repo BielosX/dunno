@@ -1,0 +1,27 @@
+region := env("AWS_REGION", "eu-central-1")
+tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+
+export AWS_REGION := region
+export AWS_PAGER := ""
+
+build:
+    GOOS=linux GOARCH=arm64 go build -o bootstrap .
+
+zip: build
+    zip bootstrap.zip bootstrap
+
+clean:
+    rm -f bootstrap
+    rm -f *.zip
+
+[working-directory: "infra"]
+deploy: clean zip
+    {{tf-bin}} init && {{tf-bin}} apply -auto-approve -var="zip_path={{justfile_directory()}}/bootstrap.zip"
+
+[working-directory: "infra"]
+destroy:
+   #!/bin/bash -e
+   tmp=$(mktemp)
+   {{tf-bin}} destroy -auto-approve -var="zip_path=${tmp}"
+   rm -f "${tmp}"
