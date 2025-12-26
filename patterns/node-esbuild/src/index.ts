@@ -1,4 +1,4 @@
-import { Context, KinesisStreamEvent } from "aws-lambda";
+import { Context, KinesisStreamEvent, KinesisStreamRecord } from "aws-lambda";
 import { pino, destination } from "pino";
 import pLimit from "p-limit";
 import { z } from "zod";
@@ -58,6 +58,13 @@ export const handler = async (event: KinesisStreamEvent, ctx: Context) => {
   const root = await protobuf.load("protobuf/user_event.proto");
   const UserEvent = root.lookupType("users.UserEvent");
   const env = envSchema.parse(process.env);
+  const sendFailedRecord = async (record: KinesisStreamRecord) => {
+    await sendSqsMessage(
+      sqsClient,
+      JSON.stringify(record),
+      env.FAILED_RECORDS_QUEUE,
+    );
+  };
   logger.level = env.LOG_LEVEL;
   logger.info(
     `Function ${ctx.invokedFunctionArn} started with Concurrency Limit ${env.CONCURRENCY_LIMIT}`,
@@ -101,11 +108,7 @@ export const handler = async (event: KinesisStreamEvent, ctx: Context) => {
             default:
               logger.error(`Unexpected user event type for ${object.userName}`);
               failedRecords++;
-              await sendSqsMessage(
-                sqsClient,
-                JSON.stringify(record),
-                env.FAILED_RECORDS_QUEUE,
-              );
+              await sendFailedRecord(record);
               break;
           }
         } catch (e) {
@@ -113,11 +116,7 @@ export const handler = async (event: KinesisStreamEvent, ctx: Context) => {
             `Unable to process a record ${record.eventID}, error: ${e}`,
           );
           failedRecords++;
-          await sendSqsMessage(
-            sqsClient,
-            JSON.stringify(record),
-            env.FAILED_RECORDS_QUEUE,
-          );
+          await sendFailedRecord(record);
         }
       }),
     ),
