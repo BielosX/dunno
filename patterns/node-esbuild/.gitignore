@@ -1,0 +1,4 @@
+bin
+producer-bin
+node_modules
+dist

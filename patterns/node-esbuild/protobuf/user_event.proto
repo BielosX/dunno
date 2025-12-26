@@ -1,0 +1,18 @@
+edition = "2023";
+package users;
+option go_package = "/internal";
+
+enum UserEventType {
+  CREATED = 0;
+  UPDATED = 1;
+  DELETED = 2;
+}
+
+message UserEvent {
+  UserEventType event_type = 1;
+  string event_id = 2;
+  string user_id = 3;
+  string user_name = 4;
+  string user_email = 5;
+  string user_timezone = 6;
+}

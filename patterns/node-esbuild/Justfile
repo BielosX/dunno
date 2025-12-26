@@ -1,0 +1,64 @@
+os := if os() == "macos" { "osx" } else { "linux" }
+arch := if arch() == "aarch64" { "aarch_64" } else { "x86_64" }
+version := "33.2"
+protoc := env("PROTOC", "bin/protoc")
+tools-dir := justfile_directory() + "/bin"
+region := env("AWS_REGION", "eu-central-1")
+tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+
+export AWS_REGION := region
+export AWS_PAGER := ""
+
+get-protoc:
+    #!/bin/bash
+    if ! [[ -f {{protoc}} && $({{protoc}} --version 2>/dev/null) == "libprotoc {{version}}" ]]; then
+       mkdir -p bin
+       url="https://github.com/protocolbuffers/protobuf/releases/download/v{{version}}/protoc-{{ version }}-{{os}}-{{arch}}.zip"
+       curl -o protoc.zip -LSs "$url"
+       unzip -o -j protoc.zip bin/protoc -d bin
+       rm -rf protoc.zip
+    fi
+
+install-gen-go:
+    GOBIN="{{tools-dir}}" go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
+generate-protobuf: get-protoc install-gen-go
+    PATH="$PATH:{{tools-dir}}" {{protoc}} --proto_path=protobuf \
+        --go_opt=default_api_level=API_OPAQUE \
+        --go_out="{{justfile_directory()}}/producer" \
+        protobuf/*.proto
+
+[working-directory: "producer"]
+producer-build:
+    go build -o producer-bin main.go
+
+fmt:
+    npx prettier --write ./**/*.ts
+
+clean:
+    rm -rf dist
+    rm -rf node_modules
+
+build: clean
+    npm install --cpu=arm64
+    npm run build
+
+[working-directory: "dist"]
+zip: build
+    zip bundle.zip index.js index.js.map
+
+bundle: zip
+    zip -u -r dist/bundle.zip protobuf
+
+[working-directory: "infra"]
+deploy: bundle
+    {{tf-bin}} init && {{tf-bin}} apply -auto-approve -var="bundle_path={{justfile_directory()}}/dist/bundle.zip"
+
+[working-directory: "infra"]
+destroy:
+    #!/bin/bash -e
+    tmp=$(mktemp)
+    {{tf-bin}} destroy -auto-approve -var="bundle_path=${tmp}"
+    rm -f "$tmp"
+
