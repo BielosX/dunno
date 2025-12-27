@@ -1,0 +1,53 @@
+region := env("AWS_REGION", "eu-central-1")
+tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+
+export AWS_REGION := region
+export AWS_PAGER := ""
+
+fmt:
+    npx prettier --write src/**/*.ts
+
+clean:
+    rm -rf dist
+    rm -rf node_modules
+
+build: clean
+    npm install --cpu=arm64
+    npm run build
+
+[working-directory: "dist"]
+zip: build
+    zip bundle.zip index.js index.js.map
+
+[working-directory: "infra"]
+deploy: zip
+    {{tf-bin}} init && {{tf-bin}} apply -auto-approve -var="bundle_path={{justfile_directory()}}/dist/bundle.zip"
+
+[working-directory: "infra"]
+destroy:
+    #!/bin/bash -e
+    tmp=$(mktemp)
+    {{tf-bin}} destroy -auto-approve -var="bundle_path=${tmp}"
+    rm -f "$tmp"
+
+invoke name sleep="2":
+    #!/bin/bash -e
+    tmp=$(mktemp)
+    log=$({{aws-cli}} lambda invoke \
+        --function-name "{{name}}" \
+        --cli-binary-format raw-in-base64-out \
+        --log-type Tail \
+        --payload "{\"sleepSeconds\": {{sleep}}}" "$tmp" | jq -r '.LogResult')
+    cat "$tmp"
+    echo
+    base64 --decode <<< "$log"
+    rm -f "$tmp"
+
+[working-directory: "invoker"]
+build-invoker:
+    go build -o invoker-bin main.go
+
+[working-directory: "invoker"]
+invoke-parallel name parallel="10" sleep="10": build-invoker
+    ./invoker-bin --function-name "{{name}}" --parallel {{parallel}} --lambda-sleep {{sleep}}
