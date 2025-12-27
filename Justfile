@@ -8,3 +8,7 @@ run-localstack:
       -p 127.0.0.1:4510-4559:4510-4559 \
       -v /var/run/docker.sock:/var/run/docker.sock \
       localstack/localstack
+
+[working-directory: "invoker"]
+build-invoker:
+    go build -o invoker-bin main.go
