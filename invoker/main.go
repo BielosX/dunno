@@ -53,11 +53,11 @@ func main() {
 		logResult = string(r)
 		match := initDurationRegexp.FindStringSubmatch(logResult)
 		if match != nil {
-			startupType = fmt.Sprintf("Cold Start Duration: %s", match[1])
+			startupType = fmt.Sprintf("Cold Start Duration: %s ms", match[1])
 		}
 		match = restoreDurationRegexp.FindStringSubmatch(logResult)
 		if match != nil {
-			startupType = fmt.Sprintf("Restore Duration: %s", match[1])
+			startupType = fmt.Sprintf("Restore Duration: %s ms", match[1])
 		}
 	}
 	fmt.Printf("%d | %s\n", out.StatusCode, startupType)
