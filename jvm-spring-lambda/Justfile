@@ -1,12 +1,21 @@
 region := env("AWS_REGION", "eu-central-1")
 tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
 aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+java-version := "25"
 
 export AWS_REGION := region
 export AWS_PAGER := ""
 
-zip:
-    ./gradlew buildZip
+get-java:
+    #!/bin/bash -e
+    if [ ! -d "jdk" ]; then
+        mkdir -p jdk
+        wget -O jdk/jdk.tar.gz "https://corretto.aws/downloads/latest/amazon-corretto-25-{{arch()}}-{{os()}}-jdk.tar.gz"
+        tar -xf jdk/jdk.tar.gz -C jdk/ --strip-components=2
+    fi
+
+zip: get-java
+    JAVA_HOME="{{justfile_directory()}}/jdk/Home" ./gradlew clean buildZip
 
 [working-directory: "infra"]
 deploy: zip

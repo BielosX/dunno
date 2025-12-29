@@ -1,7 +1,13 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import gg.jte.ContentType
+
 plugins {
     id 'org.springframework.boot' version '4.0.1'
     id 'io.spring.dependency-management' version '1.1.7'
     id "com.diffplug.spotless" version "8.1.0"
+    id "com.gradleup.shadow" version "9.3.0"
+    id 'gg.jte.gradle' version '3.2.1'
+    id 'io.freefair.lombok' version '9.1.0'
     id "java"
 }
 
@@ -11,10 +17,15 @@ repositories {
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework:spring-test:7.0.2")
     implementation ("org.slf4j:slf4j-api:2.0.17")
     implementation ("ch.qos.logback:logback-classic:1.5.23")
+    implementation("gg.jte:jte:3.2.1")
+    implementation("gg.jte:jte-runtime:3.2.1")
+    implementation(platform("software.amazon.awssdk:bom:2.40.16"))
+    implementation("software.amazon.awssdk:dynamodb-enhanced")
 
     implementation("com.amazonaws:aws-lambda-java-core:1.4.0")
     implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
@@ -23,6 +34,7 @@ dependencies {
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(25))
+        vendor.set(JvmVendorSpec.AMAZON)
     }
 }
 
@@ -36,9 +48,21 @@ bootJar {
     enabled = false
 }
 
+tasks.named('shadowJar', ShadowJar) {
+    dependsOn(precompileJte)
+    from(layout.buildDirectory.dir("jte-classes")) {
+        include "**/*.class"
+    }
+}
+
+jte {
+    precompile()
+    contentType = ContentType.Html
+    targetDirectory = layout.buildDirectory.dir("jte-classes").get().asFile.toPath()
+}
+
 tasks.register('buildZip', Zip) {
     into('lib') {
-        from(jar)
-        from(configurations.runtimeClasspath)
+        from(shadowJar)
     }
 }

@@ -18,6 +18,19 @@ resource "aws_iam_role_policy_attachment" "basic_execution_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+data "aws_iam_policy_document" "policy" {
+  statement {
+    effect    = "Allow"
+    actions   = ["dynamodb:PutItem", "dynamodb:Scan"]
+    resources = [aws_dynamodb_table.table.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "policy" {
+  policy = data.aws_iam_policy_document.policy.json
+  role   = aws_iam_role.role.id
+}
+
 resource "aws_lambda_function" "lambda" {
   function_name    = "jvm-spring-lambda"
   role             = aws_iam_role.role.arn
@@ -27,6 +40,11 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 512
   filename         = var.bundle_path
   source_code_hash = filebase64sha256(var.bundle_path)
+  environment {
+    variables = {
+      AWS_DYNAMODB_TABLE_BOOKS = aws_dynamodb_table.table.name
+    }
+  }
 }
 
 resource "aws_lambda_permission" "apigw_permission" {
