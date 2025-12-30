@@ -18,9 +18,10 @@ zip: get-java
     JAVA_HOME="{{justfile_directory()}}/jdk/Home" ./gradlew clean buildZip
 
 [working-directory: "infra"]
-deploy: zip
+deploy snap-start="false": zip
     {{tf-bin}} init && {{tf-bin}} apply -auto-approve \
-        -var="bundle_path={{justfile_directory()}}/build/distributions/jvm-spring-lambda.zip"
+        -var="bundle_path={{justfile_directory()}}/build/distributions/jvm-spring-lambda.zip" \
+        -var="snap_start={{snap-start}}"
 
 [working-directory: "infra"]
 destroy:
@@ -28,3 +29,11 @@ destroy:
     tmp=$(mktemp)
     {{tf-bin}} destroy -auto-approve -var="bundle_path=${tmp}"
     rm -f "$tmp"
+
+[working-directory: "infra"]
+snap-start-status:
+    #!/bin/bash -e
+    alias=$({{tf-bin}} output -raw latest_alias_name)
+    arn=$({{tf-bin}} output -raw function_arn)
+    aws lambda get-function-configuration --function-name "$arn" --qualifier "$alias" \
+        | jq -r '{SnapStart: .SnapStart, State: .State}'

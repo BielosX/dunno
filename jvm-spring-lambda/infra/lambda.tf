@@ -40,11 +40,24 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 512
   filename         = var.bundle_path
   source_code_hash = filebase64sha256(var.bundle_path)
+  publish          = true
   environment {
     variables = {
       AWS_DYNAMODB_TABLE_BOOKS = aws_dynamodb_table.table.name
     }
   }
+  dynamic "snap_start" {
+    for_each = var.snap_start ? [1] : []
+    content {
+      apply_on = "PublishedVersions"
+    }
+  }
+}
+
+resource "aws_lambda_alias" "latest" {
+  function_name    = aws_lambda_function.lambda.function_name
+  function_version = aws_lambda_function.lambda.version
+  name             = "latest"
 }
 
 resource "aws_lambda_permission" "apigw_permission" {
@@ -52,4 +65,5 @@ resource "aws_lambda_permission" "apigw_permission" {
   function_name = aws_lambda_function.lambda.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*"
+  qualifier     = aws_lambda_alias.latest.name
 }

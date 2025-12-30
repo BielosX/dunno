@@ -13,7 +13,7 @@ resource "aws_apigatewayv2_integration" "books" {
   api_id             = aws_apigatewayv2_api.api.id
   integration_type   = "AWS_PROXY"
   integration_method = "POST"
-  integration_uri    = aws_lambda_function.lambda.invoke_arn
+  integration_uri    = aws_lambda_alias.latest.invoke_arn
 }
 
 resource "aws_apigatewayv2_route" "route" {
