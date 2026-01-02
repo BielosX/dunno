@@ -28,7 +28,7 @@ resource "aws_api_gateway_account" "account" {
 }
 
 resource "aws_cloudwatch_log_group" "api_log_group" {
-  name = "${aws_apigatewayv2_api.api.name}-access"
+  name = "/api-gateway/${aws_apigatewayv2_api.api.name}-access"
 }
 
 resource "aws_apigatewayv2_stage" "prod" {
