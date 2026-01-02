@@ -1,0 +1,34 @@
+region := env("AWS_REGION", "eu-central-1")
+tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+java-version := "25"
+
+export AWS_REGION := region
+export AWS_PAGER := ""
+
+[working-directory: "infra"]
+deploy-providers:
+    {{tf-bin}} init
+    {{tf-bin}} apply -auto-approve -var-file="dev.tfvars"
+
+[working-directory: "infra"]
+destroy-providers:
+    {{tf-bin}} destroy -auto-approve -var-file="dev.tfvars"
+
+
+[working-directory: "kotlin-connection-pool"]
+zip-kotlin-connection-pool:
+    ./gradlew buildZip
+
+[working-directory: "kotlin-connection-pool/infra"]
+deploy-kotlin-connection-pool: zip-kotlin-connection-pool
+    {{tf-bin}} init
+    {{tf-bin}} apply -auto-approve \
+        -var="bundle_path={{justfile_directory()}}/kotlin-connection-pool/app/build/distributions/app.zip"
+
+[working-directory: "kotlin-connection-pool/infra"]
+destroy-kotlin-connection-pool:
+    #!/bin/bash -e
+    tmp=$(mktemp)
+    {{tf-bin}} destroy -auto-approve -var="bundle_path=${tmp}"
+    rm -f "$tmp"

@@ -1,0 +1,36 @@
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.shadow)
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+spotless {
+    kotlin {
+        ktfmt()
+    }
+}
+
+dependencies {
+    implementation(platform("org.http4k:http4k-bom:6.25.1.0"))
+    implementation("org.http4k:http4k-core")
+
+    implementation("com.amazonaws:aws-lambda-java-core:1.4.0")
+    implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.register('buildZip', Zip) {
+    into('lib') {
+        from(shadowJar)
+    }
+}
