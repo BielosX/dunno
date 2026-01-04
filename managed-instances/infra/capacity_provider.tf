@@ -31,8 +31,8 @@ resource "aws_iam_role_policy_attachment" "policy_attachment" {
 
 locals {
   providers = {
-    "private-subnets" = aws_subnet.private[*].id
-    "public-subnets"  = aws_subnet.public[*].id
+    "private_subnets" = aws_subnet.private[*].id
+    "public_subnets"  = aws_subnet.public[*].id
   }
 }
 
@@ -58,20 +58,4 @@ resource "aws_lambda_capacity_provider" "providers" {
   permissions_config {
     capacity_provider_operator_role_arn = aws_iam_role.role.arn
   }
-}
-
-locals {
-  arm_name_prefix = "/dunno/CapacityProviders/arm64"
-}
-
-resource "aws_ssm_parameter" "private_provider" {
-  name  = "${local.arm_name_prefix}/LambdaPrivateSubnetsCapacityProviderArn"
-  type  = "String"
-  value = aws_lambda_capacity_provider.providers["private-subnets"].arn
-}
-
-resource "aws_ssm_parameter" "public_provider" {
-  name  = "${local.arm_name_prefix}/LambdaPublicSubnetsCapacityProviderArn"
-  type  = "String"
-  value = aws_lambda_capacity_provider.providers["public-subnets"].arn
 }

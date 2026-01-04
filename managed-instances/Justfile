@@ -18,17 +18,60 @@ destroy-providers:
 
 [working-directory: "kotlin-connection-pool"]
 zip-kotlin-connection-pool:
-    ./gradlew buildZip
+    ./gradlew clean buildZip
 
-[working-directory: "kotlin-connection-pool/infra"]
+[working-directory: "kotlin-connection-pool/infra/lambda"]
 deploy-kotlin-connection-pool: zip-kotlin-connection-pool
     {{tf-bin}} init
     {{tf-bin}} apply -auto-approve \
         -var="bundle_path={{justfile_directory()}}/kotlin-connection-pool/app/build/distributions/app.zip"
 
-[working-directory: "kotlin-connection-pool/infra"]
+[working-directory: "kotlin-connection-pool/infra/lambda"]
 destroy-kotlin-connection-pool:
     #!/bin/bash -e
     tmp=$(mktemp)
     {{tf-bin}} destroy -auto-approve -var="bundle_path=${tmp}"
     rm -f "$tmp"
+
+local-postgres:
+    podman run -it -p 5432:5432 -e POSTGRES_USER="test" \
+        -e POSTGRES_PASSWORD="test" \
+        -e POSTGRES_DB="postgres" \
+        --tmpfs /var/lib/postgresql/data:rw,size=512m \
+        postgres:18-alpine
+
+[working-directory: "kotlin-connection-pool/infra/rds"]
+deploy-rds:
+    {{tf-bin}} init
+    {{tf-bin}} apply -auto-approve
+
+[working-directory: "kotlin-connection-pool/infra/rds"]
+destroy-rds:
+    {{tf-bin}} destroy -auto-approve
+
+
+[working-directory: "kotlin-connection-pool/infra/rds"]
+rds-tunnel:
+    #!/bin/bash -e
+    instance_id=$(tofu output -raw bastion_instance_id)
+    endpoint=$(tofu output -raw cluster_endpoint)
+    {{aws-cli}} ssm start-session \
+      --target "$instance_id" \
+      --document-name AWS-StartPortForwardingSessionToRemoteHost \
+      --parameters "{\"host\":[\"$endpoint\"],\"portNumber\":[\"5432\"],\"localPortNumber\":[\"5432\"]}"
+
+[working-directory: "kotlin-connection-pool/infra/rds"]
+get-master-password:
+    #!/bin/bash -e
+    cluster_id=$(tofu output -raw cluster_id)
+    {{aws-cli}} ssm get-parameter --name "/rds/$cluster_id/master-password" \
+        --with-decryption | jq -r '.Parameter.Value'
+
+[working-directory: "kotlin-connection-pool"]
+migrate-db host="localhost" port="5432" user="test" password="test" ssl="require":
+    ./gradlew flywayMigrate \
+        -PdbSsl="{{ssl}}" \
+        -PdbHost="{{host}}" \
+        -PdbPort="{{port}}" \
+        -PdbUser="{{user}}" \
+        -PdbPassword="{{password}}"

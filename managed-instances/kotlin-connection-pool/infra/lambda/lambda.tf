@@ -1,3 +1,12 @@
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+locals {
+  region        = data.aws_region.current.region
+  account_id    = data.aws_caller_identity.current.account_id
+  rds_user_name = "lambda_user"
+}
+
 data "aws_iam_policy_document" "assume_role" {
   statement {
     effect  = "Allow"
@@ -18,11 +27,41 @@ resource "aws_iam_role_policy_attachment" "basic_execution_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-data "aws_ssm_parameter" "capacity_provider" {
-  name = "/dunno/CapacityProviders/arm64/LambdaPrivateSubnetsCapacityProviderArn"
+resource "aws_ssm_parameter" "config" {
+  name = "KotlinConnectionPoolConfig"
+  type = "String"
+  value = jsonencode({
+    db = {
+      username = local.rds_user_name
+      host     = local.cluster_endpoint
+      port     = local.db_port
+      name     = local.db_name
+    }
+  })
+}
+
+data "aws_iam_policy_document" "lambda_role_policy" {
+  statement {
+    effect  = "Allow"
+    actions = ["rds-db:connect"]
+    resources = [
+      "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${local.cluster_resource_id}/${local.rds_user_name}"
+    ]
+  }
+  statement {
+    effect    = "Allow"
+    actions   = ["ssm:GetParameter"]
+    resources = [aws_ssm_parameter.config.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_role_policy" {
+  policy = data.aws_iam_policy_document.lambda_role_policy.json
+  role   = aws_iam_role.role.id
 }
 
 resource "aws_lambda_function" "lambda" {
+  depends_on       = [aws_ssm_parameter.config]
   function_name    = "kotlin-connection-pool"
   role             = aws_iam_role.role.arn
   runtime          = "java25"
@@ -36,7 +75,7 @@ resource "aws_lambda_function" "lambda" {
 
   capacity_provider_config {
     lambda_managed_instances_capacity_provider_config {
-      capacity_provider_arn = data.aws_ssm_parameter.capacity_provider.value
+      capacity_provider_arn = local.private_capacity_provider_arn
     }
   }
 }
