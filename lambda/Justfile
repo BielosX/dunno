@@ -99,9 +99,17 @@ java-zip: java-clean
 python-clean:
     rm -f *.zip
 
+[working-directory: "ruby"]
+ruby-clean:
+    rm -f *.zip
+
 [working-directory: "python"]
 python-zip: python-clean
     zip dunno.zip main.py
+
+[working-directory: "ruby"]
+ruby-zip: ruby-clean
+    zip dunno.zip main.rb
 
 snapstart-status name:
     {{aws-cli}} lambda get-function-configuration --function-name "{{name}}" \
@@ -141,6 +149,11 @@ deploy-lambda language snap_start="false":
         {{aws-cli}} s3 cp dotnet/bin/Release/net8.0/dotnet.zip "s3://${bucket}/${bucket_key}"
         just lambda-apply "dotnet" "dunno::dunno.Function::FunctionHandler" \
             "${bucket}" "${bucket_key}" "{{lambda-count}}" "{{snap_start}}"
+        ;;
+      "ruby")
+        just ruby-zip
+        {{aws-cli}} s3 cp ruby/dunno.zip "s3://${bucket}/${bucket_key}"
+        just lambda-apply "ruby" "main.handler" "${bucket}" "${bucket_key}" "{{lambda-count}}"
         ;;
       *)
         echo "Wrong language name"
