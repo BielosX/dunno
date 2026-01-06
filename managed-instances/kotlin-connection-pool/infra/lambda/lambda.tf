@@ -32,10 +32,13 @@ resource "aws_ssm_parameter" "config" {
   type = "String"
   value = jsonencode({
     db = {
-      username = local.rds_user_name
-      host     = local.cluster_endpoint
-      port     = local.db_port
-      name     = local.db_name
+      username    = local.rds_user_name
+      host        = local.cluster_endpoint
+      port        = local.db_port
+      name        = local.db_name
+      maxPoolSize = 16,
+      minIdle     = 4,
+      sslMode     = "require"
     }
   })
 }
