@@ -24,7 +24,7 @@ var initDurationRegexp *regexp.Regexp
 var restoreDurationRegexp *regexp.Regexp
 var logger *slog.Logger
 
-func invokeFunction(ctx context.Context, language, functionName, arn *string) (*float64, error) {
+func invokeFunction(ctx context.Context, language, functionName, alias, arn *string) (*float64, error) {
 	tagsOut, err := lambdaClient.ListTags(ctx, &lambda.ListTagsInput{
 		Resource: arn,
 	})
@@ -37,9 +37,14 @@ func invokeFunction(ctx context.Context, language, functionName, arn *string) (*
 		return nil, nil
 	}
 	logger.Info("Invoking function", "function", *functionName)
+	var qualifier *string
+	if *alias != "" {
+		qualifier = alias
+	}
 	invokeOut, err := lambdaClient.Invoke(ctx, &lambda.InvokeInput{
-		FunctionName: functionName,
+		FunctionName: arn,
 		LogType:      lambdaTypes.LogTypeTail,
+		Qualifier:    qualifier,
 	})
 	if err != nil {
 		return nil, err
@@ -78,8 +83,10 @@ func invokeFunction(ctx context.Context, language, functionName, arn *string) (*
 func main() {
 	var language string
 	var logLevel string
+	var alias string
 	flag.StringVar(&language, "language", "", "Function language")
 	flag.StringVar(&logLevel, "log-level", "info", "Function log level")
+	flag.StringVar(&alias, "alias", "", "Version Alias")
 	flag.Parse()
 	level := slog.Level(0)
 	err := level.UnmarshalText([]byte(logLevel))
@@ -115,13 +122,14 @@ func main() {
 		}
 		group, newCtx := errgroup.WithContext(ctx)
 		for _, function := range page.Functions {
-			logger.Info("Found function", "arn", function.FunctionArn)
+			logger.Info("Found function", "arn", *function.FunctionArn)
 			group.Go(func() error {
 				select {
 				default:
 					startupDuration, err := invokeFunction(newCtx,
 						&language,
 						function.FunctionName,
+						&alias,
 						function.FunctionArn)
 					if err != nil {
 						return err
@@ -143,11 +151,11 @@ func main() {
 					return nil
 				}
 			})
-			err = group.Wait()
-			if err != nil {
-				logger.Error("invocation failed", "error", err)
-				os.Exit(1)
-			}
+		}
+		err = group.Wait()
+		if err != nil {
+			logger.Error("invocation failed", "error", err)
+			os.Exit(1)
 		}
 	}
 	averageValue = averageValue / float64(count)

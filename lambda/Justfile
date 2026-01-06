@@ -119,8 +119,8 @@ python-zip: python-clean
 ruby-zip: ruby-clean
     zip dunno.zip main.rb
 
-snapstart-status name:
-    {{aws-cli}} lambda get-function-configuration --function-name "{{name}}" \
+snapstart-status name alias:
+    {{aws-cli}} lambda get-function-configuration --function-name "{{name}}" --qualifier "{{alias}}" \
         | jq -r '{SnapStart: .SnapStart, State: .State}'
 
 deploy-lambda language snap_start="false":

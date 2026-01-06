@@ -53,3 +53,10 @@ resource "aws_lambda_function" "lambda" {
     }
   }
 }
+
+resource "aws_lambda_alias" "alias" {
+  count            = var.lambda_count
+  function_name    = aws_lambda_function.lambda[count.index].function_name
+  function_version = aws_lambda_function.lambda[count.index].version
+  name             = "latest"
+}
