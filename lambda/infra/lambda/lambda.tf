@@ -24,7 +24,7 @@ locals {
     "rust"   = "provided.al2023"
     "python" = "python3.14"
     "java"   = "java25"
-    "dotnet" = "dotnet8"
+    "dotnet" = "dotnet8" // dotnet9 container only
   }
 }
 

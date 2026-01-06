@@ -73,6 +73,11 @@ golang-build:
         ;;
     esac
 
+[working-directory: "dotnet"]
+dotnet-package:
+    #!/bin/bash -e
+    dotnet lambda package --farch "{{lambda-arch}}"
+
 [working-directory: "golang"]
 golang-zip: golang-build
     zip dunno.zip bootstrap
@@ -130,6 +135,12 @@ deploy-lambda language snap_start="false":
         just rust-build
         {{aws-cli}} s3 cp rust/target/lambda/dunno/bootstrap.zip "s3://${bucket}/${bucket_key}"
         just lambda-apply "rust" "dummy" "${bucket}" "${bucket_key}" "{{lambda-count}}"
+        ;;
+      "dotnet")
+        just dotnet-package
+        {{aws-cli}} s3 cp dotnet/bin/Release/net8.0/dotnet.zip "s3://${bucket}/${bucket_key}"
+        just lambda-apply "dotnet" "dunno::dunno.Function::FunctionHandler" \
+            "${bucket}" "${bucket_key}" "{{lambda-count}}" "{{snap_start}}"
         ;;
       *)
         echo "Wrong language name"
