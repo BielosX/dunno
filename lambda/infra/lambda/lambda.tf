@@ -25,6 +25,7 @@ locals {
     "python" = "python3.14"
     "java"   = "java25"
     "ruby"   = "ruby3.4"
+    "js"     = "nodejs24.x"
     "dotnet" = "dotnet8" // dotnet9 container only
   }
 }

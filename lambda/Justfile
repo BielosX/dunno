@@ -103,6 +103,14 @@ python-clean:
 ruby-clean:
     rm -f *.zip
 
+[working-directory: "js"]
+js-clean:
+    rm -f *.zip
+
+[working-directory: "js"]
+js-zip:
+    zip dunno.zip main.js
+
 [working-directory: "python"]
 python-zip: python-clean
     zip dunno.zip main.py
@@ -154,6 +162,11 @@ deploy-lambda language snap_start="false":
         just ruby-zip
         {{aws-cli}} s3 cp ruby/dunno.zip "s3://${bucket}/${bucket_key}"
         just lambda-apply "ruby" "main.handler" "${bucket}" "${bucket_key}" "{{lambda-count}}"
+        ;;
+      "js")
+        just js-zip
+        {{aws-cli}} s3 cp js/dunno.zip "s3://${bucket}/${bucket_key}"
+        just lambda-apply "js" "main.handler" "${bucket}" "${bucket_key}" "{{lambda-count}}"
         ;;
       *)
         echo "Wrong language name"
