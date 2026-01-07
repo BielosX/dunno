@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,17 +41,23 @@ func calcMedian(values []float64) float64 {
 	return values[size>>1]
 }
 
-func invokeFunction(ctx context.Context, language, functionName, alias, arn *string) (*float64, error) {
-	tagsOut, err := lambdaClient.ListTags(ctx, &lambda.ListTagsInput{
-		Resource: arn,
-	})
-	if err != nil {
-		logger.Error("unable to list tags", "error", err)
-		os.Exit(1)
-	}
-	functionLanguage, ok := tagsOut.Tags["language"]
-	if !ok || functionLanguage != *language {
-		return nil, nil
+func invokeFunction(ctx context.Context, prefix, language, functionName, alias, arn *string) (*float64, error) {
+	if *prefix != "" {
+		if !strings.HasPrefix(*functionName, *prefix) {
+			return nil, nil
+		}
+	} else {
+		tagsOut, err := lambdaClient.ListTags(ctx, &lambda.ListTagsInput{
+			Resource: arn,
+		})
+		if err != nil {
+			logger.Error("unable to list tags", "error", err)
+			os.Exit(1)
+		}
+		functionLanguage, ok := tagsOut.Tags["language"]
+		if !ok || functionLanguage != *language {
+			return nil, nil
+		}
 	}
 	logger.Info("Invoking function", "function", *functionName)
 	var qualifier *string
@@ -97,10 +104,12 @@ func invokeFunction(ctx context.Context, language, functionName, alias, arn *str
 }
 
 func main() {
+	var prefix string
 	var language string
 	var logLevel string
 	var alias string
 	var parallel int64
+	flag.StringVar(&prefix, "prefix", "", "Function name prefix")
 	flag.StringVar(&language, "language", "", "Function language")
 	flag.StringVar(&logLevel, "log-level", "info", "Function log level")
 	flag.StringVar(&alias, "alias", "", "Version Alias")
@@ -154,6 +163,7 @@ func main() {
 				select {
 				default:
 					startupDuration, err := invokeFunction(newCtx,
+						&prefix,
 						&language,
 						function.FunctionName,
 						&alias,
