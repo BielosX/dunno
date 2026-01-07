@@ -41,31 +41,31 @@ func calcMedian(values []float64) float64 {
 	return values[size>>1]
 }
 
-func invokeFunction(ctx context.Context, prefix, language, functionName, alias, arn *string) (*float64, error) {
-	if *prefix != "" {
-		if !strings.HasPrefix(*functionName, *prefix) {
+func invokeFunction(ctx context.Context, prefix, language, functionName, alias, arn string) (*float64, error) {
+	if prefix != "" {
+		if !strings.HasPrefix(functionName, prefix) {
 			return nil, nil
 		}
 	} else {
 		tagsOut, err := lambdaClient.ListTags(ctx, &lambda.ListTagsInput{
-			Resource: arn,
+			Resource: aws.String(arn),
 		})
 		if err != nil {
 			logger.Error("unable to list tags", "error", err)
 			os.Exit(1)
 		}
 		functionLanguage, ok := tagsOut.Tags["language"]
-		if !ok || functionLanguage != *language {
+		if !ok || functionLanguage != language {
 			return nil, nil
 		}
 	}
-	logger.Info("Invoking function", "function", *functionName)
+	logger.Info("Invoking function", "function", functionName)
 	var qualifier *string
-	if *alias != "" {
-		qualifier = alias
+	if alias != "" {
+		qualifier = aws.String(alias)
 	}
 	invokeOut, err := lambdaClient.Invoke(ctx, &lambda.InvokeInput{
-		FunctionName: arn,
+		FunctionName: aws.String(functionName),
 		LogType:      lambdaTypes.LogTypeTail,
 		Qualifier:    qualifier,
 	})
@@ -96,9 +96,9 @@ func invokeFunction(ctx context.Context, prefix, language, functionName, alias, 
 			logger.Info("Restore Duration found", "value", duration)
 			return &duration, nil
 		}
-		logger.Warn("Initial or Restore Duration not found", "name", *functionName)
+		logger.Warn("Initial or Restore Duration not found", "name", functionName)
 	} else {
-		logger.Warn("Log Result not available", "name", *functionName)
+		logger.Warn("Log Result not available", "name", functionName)
 	}
 	return nil, nil
 }
@@ -163,11 +163,11 @@ func main() {
 				select {
 				default:
 					startupDuration, err := invokeFunction(newCtx,
-						&prefix,
-						&language,
-						function.FunctionName,
-						&alias,
-						function.FunctionArn)
+						prefix,
+						language,
+						*function.FunctionName,
+						alias,
+						*function.FunctionArn)
 					if err != nil {
 						return err
 					}
