@@ -59,6 +59,11 @@ destroy-lambda:
     {{tf-bin}} destroy -auto-approve
 
 [working-directory: "golang"]
+golang-clean:
+    rm -f bootstrap
+    rm -f *.zip
+
+[working-directory: "golang"]
 golang-build:
     #!/bin/bash -e
     case "{{lambda-arch}}" in
@@ -79,13 +84,8 @@ dotnet-package:
     dotnet lambda package --farch "{{lambda-arch}}"
 
 [working-directory: "golang"]
-golang-zip: golang-build
+golang-zip: golang-clean golang-build
     zip dunno.zip bootstrap
-
-[working-directory: "golang"]
-golang-clean:
-    rm -f bootstrap
-    rm -f *.zip
 
 [working-directory: "java"]
 java-clean:
