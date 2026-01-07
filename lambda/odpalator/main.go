@@ -100,9 +100,11 @@ func main() {
 	var language string
 	var logLevel string
 	var alias string
+	var parallel int64
 	flag.StringVar(&language, "language", "", "Function language")
 	flag.StringVar(&logLevel, "log-level", "info", "Function log level")
 	flag.StringVar(&alias, "alias", "", "Version Alias")
+	flag.Int64Var(&parallel, "parallel", -1, "Goroutine parallel invocations")
 	flag.Parse()
 	level := slog.Level(0)
 	err := level.UnmarshalText([]byte(logLevel))
@@ -143,6 +145,9 @@ func main() {
 			os.Exit(1)
 		}
 		group, newCtx := errgroup.WithContext(ctx)
+		if parallel > 0 {
+			group.SetLimit(int(parallel))
+		}
 		for _, function := range page.Functions {
 			logger.Info("Found function", "arn", *function.FunctionArn)
 			group.Go(func() error {
