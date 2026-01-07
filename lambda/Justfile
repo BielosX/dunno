@@ -80,8 +80,7 @@ golang-build:
 
 [working-directory: "dotnet"]
 dotnet-package:
-    #!/bin/bash -e
-    dotnet lambda package --farch "{{lambda-arch}}"
+    dotnet lambda package -farch "{{lambda-arch}}"
 
 [working-directory: "golang"]
 golang-zip: golang-clean golang-build

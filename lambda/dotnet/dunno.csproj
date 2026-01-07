@@ -8,6 +8,7 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PublishReadyToRun>true</PublishReadyToRun>
     <AssemblyName>dunno</AssemblyName>
+    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Amazon.Lambda.Core" Version="2.8.0" />
