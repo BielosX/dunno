@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -25,6 +26,19 @@ var lambdaClient *lambda.Client
 var initDurationRegexp *regexp.Regexp
 var restoreDurationRegexp *regexp.Regexp
 var logger *slog.Logger
+
+func calcMedian(values []float64) float64 {
+	size := len(values)
+	sort.Float64s(values)
+	if size == 0 {
+		return math.NaN()
+	}
+	if size%2 == 0 {
+		index := size >> 1
+		return (values[index] + values[index-1]) / 2.0
+	}
+	return values[size>>1]
+}
 
 func invokeFunction(ctx context.Context, language, functionName, alias, arn *string) (*float64, error) {
 	tagsOut, err := lambdaClient.ListTags(ctx, &lambda.ListTagsInput{
@@ -117,6 +131,7 @@ func main() {
 	maxValue := 0.0
 	minValue := math.MaxFloat64
 	averageValue := 0.0
+	var results []float64
 	resultLock := sync.Mutex{}
 	paginator := lambda.NewListFunctionsPaginator(lambdaClient, &lambda.ListFunctionsInput{
 		MaxItems: aws.Int32(50),
@@ -143,6 +158,7 @@ func main() {
 					}
 					if startupDuration != nil {
 						resultLock.Lock()
+						results = append(results, *startupDuration)
 						averageValue += *startupDuration
 						if maxValue < *startupDuration {
 							maxValue = *startupDuration
@@ -166,5 +182,6 @@ func main() {
 		}
 	}
 	averageValue = averageValue / float64(count)
-	fmt.Printf("Min: %f, Max: %f, Average: %f\n", minValue, maxValue, averageValue)
+	median := calcMedian(results)
+	fmt.Printf("Min: %f, Max: %f, Median: %f, Average: %f\n", minValue, maxValue, median, averageValue)
 }
