@@ -1,5 +1,5 @@
 build:
-    go build -o odpalator main.go
+    go build -o odpalator -ldflags "-s -w" main.go
 
 clean:
     rm -f odpalator
