@@ -1,0 +1,39 @@
+region := env("AWS_REGION", "eu-central-1")
+tf-bin := env("TF_BIN", "tofu") # for tofu tflocal: TF_BIN=tflocal TF_CMD=tofu
+aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
+
+export AWS_REGION := region
+export AWS_PAGER := ""
+
+build:
+    GOOS=linux GOARCH=arm64 go build -o bootstrap -ldflags "-s -w" main.go
+
+clean:
+    rm -f odpalator
+
+fmt:
+    gofmt -w .
+
+[working-directory: "sqs-spammer"]
+build-sqs-spammer:
+    go build -o spammer -ldflags "-s -w" main.go
+
+zip: build
+    rm -f dunno.zip
+    zip dunno.zip bootstrap
+
+[working-directory: "infra"]
+deploy: zip
+    {{tf-bin}} init && {{tf-bin}} apply -auto-approve -var="bundle_path={{justfile_directory()}}/dunno.zip"
+
+[working-directory: "infra"]
+destroy:
+    #!/bin/bash -e
+    tmp=$(mktemp)
+    {{tf-bin}} destroy -auto-approve -var="bundle_path=${tmp}"
+    rm -f "${tmp}"
+
+get-pc-status:
+   {{aws-cli}} lambda get-provisioned-concurrency-config \
+     --function-name pc_scaling \
+     --qualifier latest
