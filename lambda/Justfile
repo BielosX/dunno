@@ -5,6 +5,7 @@ lambda-count := env("LAMBDA_COUNT", "1")
 lambda-amd64-arch := "x86_64"
 lambda-arm64-arch := "arm64"
 lambda-arch := env("LAMBDA_ARCH", "x86_64")
+lambda-vpc := env("LAMBDA_VPC", "false")
 
 export AWS_REGION := region
 
@@ -52,7 +53,8 @@ lambda-apply language handler bucket bucket_key count snap_start="false":
         -var="architecture={{lambda-arch}}" \
         -var="bucket_key={{bucket_key}}" \
         -var="lambda_count={{count}}" \
-        -var="snap_start={{snap_start}}"
+        -var="snap_start={{snap_start}}" \
+        -var="vpc={{lambda-vpc}}"
 
 [working-directory: "infra/lambda"]
 destroy-lambda:

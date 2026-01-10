@@ -13,9 +13,17 @@ resource "aws_iam_role" "role" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
+locals {
+  managed_policies = [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+  ]
+}
+
 resource "aws_iam_role_policy_attachment" "attachment" {
+  for_each   = toset(local.managed_policies)
   role       = aws_iam_role.role.id
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  policy_arn = each.value
 }
 
 locals {
@@ -31,6 +39,11 @@ locals {
   }
 }
 
+module "vpc" {
+  count  = var.vpc ? 1 : 0
+  source = "./vpc"
+}
+
 resource "aws_lambda_function" "lambda" {
   count         = var.lambda_count
   function_name = "${var.language}-${count.index}"
@@ -44,6 +57,13 @@ resource "aws_lambda_function" "lambda" {
   s3_key        = var.bucket_key
   architectures = [var.architecture]
   publish       = true # Required for SnapStart
+  dynamic "vpc_config" {
+    for_each = var.vpc ? [1] : []
+    content {
+      security_group_ids = [module.vpc[0].lambda_sg_id]
+      subnet_ids         = [module.vpc[0].private_subnet_id]
+    }
+  }
   tags = {
     language = var.language
   }

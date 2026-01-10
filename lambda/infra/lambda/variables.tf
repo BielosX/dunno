@@ -32,3 +32,8 @@ variable "architecture" {
   type    = string
   default = "arm64"
 }
+
+variable "vpc" {
+  type    = bool
+  default = "false"
+}
