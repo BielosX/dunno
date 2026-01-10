@@ -58,6 +58,8 @@ lambda-apply language handler bucket bucket_key count snap_start="false":
 destroy-lambda:
     {{tf-bin}} destroy -auto-approve
 
+destroy-all: destroy-lambda artifacts-destroy
+
 [working-directory: "golang"]
 golang-clean:
     rm -f bootstrap
