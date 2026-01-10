@@ -63,6 +63,30 @@ golang-clean:
     rm -f bootstrap
     rm -f *.zip
 
+[working-directory: "quarkus"]
+quarkus-cross-compile arch:
+    ./gradlew build \
+      -Dquarkus.native.enabled=true \
+      -Dquarkus.package.jar.enabled=false \
+      -Dquarkus.native.container-build=true \
+      -Dquarkus.native.container-runtime=docker \
+      -Dquarkus.native.additional-build-args="--no-fallback" \
+      -Dquarkus.native.container-runtime-options="--platform=linux/{{arch}}"
+
+quarkus-build:
+    #!/bin/bash -e
+    case "{{lambda-arch}}" in
+      "{{lambda-arm64-arch}}")
+        just quarkus-cross-compile "arm64"
+        ;;
+      "{{lambda-amd64-arch}}")
+        just quarkus-cross-compile "amd64"
+        ;;
+      *)
+        echo "Arch {{lambda-arch}} not supported"
+        ;;
+    esac
+
 [working-directory: "golang"]
 golang-build:
     #!/bin/bash -e
@@ -166,6 +190,11 @@ deploy-lambda language snap_start="false":
         just js-zip
         {{aws-cli}} s3 cp js/dunno.zip "s3://${bucket}/${bucket_key}"
         just lambda-apply "js" "main.handler" "${bucket}" "${bucket_key}" "{{lambda-count}}"
+        ;;
+      "quarkus")
+        just quarkus-build
+        {{aws-cli}} s3 cp quarkus/app/build/function.zip "s3://${bucket}/${bucket_key}"
+        just lambda-apply "quarkus" "org.dunno.Handler" "${bucket}" "${bucket_key}" "{{lambda-count}}"
         ;;
       *)
         echo "Wrong language name"

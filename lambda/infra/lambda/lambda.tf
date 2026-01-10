@@ -20,13 +20,14 @@ resource "aws_iam_role_policy_attachment" "attachment" {
 
 locals {
   runtimes = {
-    "golang" = "provided.al2023"
-    "rust"   = "provided.al2023"
-    "python" = "python3.14"
-    "java"   = "java25"
-    "ruby"   = "ruby3.4"
-    "js"     = "nodejs24.x"
-    "dotnet" = "dotnet8" // dotnet9 container only
+    "quarkus" = "provided.al2023"
+    "golang"  = "provided.al2023"
+    "rust"    = "provided.al2023"
+    "python"  = "python3.14"
+    "java"    = "java25"
+    "ruby"    = "ruby3.4"
+    "js"      = "nodejs24.x"
+    "dotnet"  = "dotnet8" // dotnet9 container only
   }
 }
 
