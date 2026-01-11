@@ -8,20 +8,23 @@ clean:
     rm -f bootstrap
     rm -f *.zip
 
-build: clean
+[working-directory: "gorilla-mux"]
+gorilla-build: clean
     GOOS=linux GOARCH=arm64 go build -o bootstrap main.go
 
-zip: build
+[working-directory: "gorilla-mux"]
+gorilla-zip: gorilla-build
     zip bootstrap.zip bootstrap
 
 [working-directory: "infra"]
-deploy: zip
-    {{tf-bin}} init && {{tf-bin}} apply -auto-approve -var="file_name={{justfile_directory()}}/bootstrap.zip"
+deploy: gorilla-zip
+    {{tf-bin}} init && {{tf-bin}} apply -auto-approve \
+        -var="gorilla_bundle_path={{justfile_directory()}}/gorilla-mux/bootstrap.zip"
 
 [working-directory: "infra"]
 destroy:
     #!/bin/bash -e
     tmp=$(mktemp)
-    {{tf-bin}} destroy -auto-approve -var="file_name=${tmp}"
+    {{tf-bin}} destroy -auto-approve -var="gorilla_bundle_path=${tmp}"
     rm -f "${tmp}"
 

@@ -35,17 +35,28 @@ resource "aws_iam_role_policy_attachment" "attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+locals {
+  handlers = {
+    "gorilla-mux" = {
+      filename = var.gorilla_bundle_path
+      runtime  = "provided.al2023"
+      handler  = "dummy"
+    }
+  }
+}
+
 resource "aws_lambda_function" "lambda" {
-  function_name    = "http-mux"
+  for_each         = local.handlers
+  function_name    = each.key
   role             = aws_iam_role.role.arn
-  handler          = "handler"
-  runtime          = "provided.al2023"
+  handler          = each.value["handler"]
+  runtime          = each.value["runtime"]
   timeout          = 30
   memory_size      = 512
   package_type     = "Zip"
   architectures    = ["arm64"]
-  filename         = var.file_name
-  source_code_hash = filebase64sha256(var.file_name)
+  filename         = each.value["filename"]
+  source_code_hash = filebase64sha256(each.value["filename"])
   environment {
     variables = {
       BOOKS_TABLE_ARN = aws_dynamodb_table.table.arn
@@ -53,9 +64,17 @@ resource "aws_lambda_function" "lambda" {
   }
 }
 
+module "apigw" {
+  for_each          = local.handlers
+  source            = "./apigw"
+  lambda_invoke_arn = aws_lambda_function.lambda[each.key].invoke_arn
+  name              = "http-${each.key}"
+}
+
 resource "aws_lambda_permission" "apigw_permission" {
+  for_each      = local.handlers
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda.function_name
+  function_name = aws_lambda_function.lambda[each.key].function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*"
+  source_arn    = "${module.apigw[each.key].execution_arn}/*"
 }
