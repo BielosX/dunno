@@ -42,6 +42,11 @@ locals {
       runtime  = "provided.al2023"
       handler  = "dummy"
     }
+    "python-powertools" = {
+      filename = var.python_powertools_path
+      runtime  = "python3.14"
+      handler  = "main.handler"
+    }
   }
 }
 

@@ -16,15 +16,37 @@ gorilla-build: clean
 gorilla-zip: gorilla-build
     zip bootstrap.zip bootstrap
 
+[working-directory: "python-powertools"]
+python-powertools-build:
+    rm -rf build-arm64
+    mkdir -p build-arm64/
+    uv venv
+    source .venv/bin/activate
+    uv sync && uv export --no-hashes --no-header --no-annotate --no-dev --format requirements-txt > requirements.txt
+    uv run python -m ensurepip --upgrade
+    uv run python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt \
+        --platform manylinux2014_aarch64 \
+        --only-binary=:all: \
+        --target build-arm64/
+    cp main.py build-arm64/
+
+[working-directory: "python-powertools/build-arm64"]
+python-powertools-zip: python-powertools-build
+    zip -r ../lambda-arm64.zip .
+
 [working-directory: "infra"]
-deploy: gorilla-zip
+deploy: gorilla-zip python-powertools-zip
     {{tf-bin}} init && {{tf-bin}} apply -auto-approve \
-        -var="gorilla_bundle_path={{justfile_directory()}}/gorilla-mux/bootstrap.zip"
+        -var="gorilla_bundle_path={{justfile_directory()}}/gorilla-mux/bootstrap.zip" \
+        -var="python_powertools_path={{justfile_directory()}}/python-powertools/lambda-arm64.zip"
 
 [working-directory: "infra"]
 destroy:
     #!/bin/bash -e
     tmp=$(mktemp)
-    {{tf-bin}} destroy -auto-approve -var="gorilla_bundle_path=${tmp}"
+    {{tf-bin}} destroy -auto-approve \
+        -var="gorilla_bundle_path=${tmp}" \
+        -var="python_powertools_path=${tmp}"
     rm -f "${tmp}"
 

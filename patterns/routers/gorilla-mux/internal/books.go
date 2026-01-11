@@ -156,7 +156,7 @@ func ListBooks(r *Request[Unit]) *Response[ListBooksResponse] {
 	if err != nil {
 		return ServerError[ListBooksResponse](err)
 	}
-	var items []BookResponse
+	items := make([]BookResponse, 0)
 	for _, book := range books {
 		items = append(items, BookResponse{
 			Id:      book.Id,

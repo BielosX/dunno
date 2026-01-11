@@ -33,8 +33,8 @@ func (w *ApiGwResponseWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 }
 
-func (w *ApiGwResponseWriter) GetResponse() events.APIGatewayProxyResponse {
-	return events.APIGatewayProxyResponse{
+func (w *ApiGwResponseWriter) GetResponse() events.APIGatewayV2HTTPResponse {
+	return events.APIGatewayV2HTTPResponse{
 		StatusCode:        w.statusCode,
 		MultiValueHeaders: w.header,
 		Body:              string(w.body),

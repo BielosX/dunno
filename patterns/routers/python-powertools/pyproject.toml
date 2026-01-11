@@ -1,0 +1,16 @@
+[project]
+name = "python-powertools"
+version = "0.1.0"
+description = "Python PowerTools example"
+requires-python = ">=3.14"
+dependencies = [
+    "aws-lambda-powertools>=3.24.0",
+    "boto3>=1.42.25",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.11",
+]

@@ -25,7 +25,7 @@ type Request[T any] struct {
 	Context     context.Context
 	Body        T
 	PathParams  map[string]string
-	QueryParams map[string][]string
+	QueryParams map[string]string
 }
 
 type Unit struct{}
@@ -69,7 +69,7 @@ func GetQueryParam[T any](r *Request[T], key string) string {
 	if !ok {
 		return ""
 	}
-	return value[0]
+	return value
 }
 
 func ErrorResponse[T any](err error, statusCode int) *Response[T] {
@@ -121,7 +121,7 @@ func WithPathParams(r *http.Request, params map[string]string) *http.Request {
 	return r.WithContext(ctx)
 }
 
-func WithQueryParams(r *http.Request, params map[string][]string) *http.Request {
+func WithQueryParams(r *http.Request, params map[string]string) *http.Request {
 	ctx := context.WithValue(r.Context(), QueryParams{}, params)
 	return r.WithContext(ctx)
 }
@@ -130,8 +130,8 @@ func GetPathParams(r *http.Request) map[string]string {
 	return r.Context().Value(PathParams{}).(map[string]string)
 }
 
-func GetQueryParams(r *http.Request) map[string][]string {
-	return r.Context().Value(QueryParams{}).(map[string][]string)
+func GetQueryParams(r *http.Request) map[string]string {
+	return r.Context().Value(QueryParams{}).(map[string]string)
 }
 
 func RegisterFunc[I any, O any](router *mux.Router,
@@ -190,9 +190,9 @@ func toHandleFunc[I any, O any](handler func(request *Request[I]) *Response[O]) 
 			w.WriteHeader(response.StatusCode)
 			_, _ = w.Write(responseBody)
 			return
-		} else {
-			w.WriteHeader(http.StatusNoContent)
-			return
 		}
+
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 }
