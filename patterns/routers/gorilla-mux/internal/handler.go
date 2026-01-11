@@ -18,16 +18,20 @@ func HandleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) 
 		zap.String("path", request.RawPath),
 		zap.String("method", method),
 		zap.String("body", request.Body))
-	httpRequest, err := http.NewRequestWithContext(ctx, method, request.RawPath, strings.NewReader(request.Body))
+	httpRequest, err := http.NewRequestWithContext(ctx, method, path, strings.NewReader(request.Body))
 	if err != nil {
 		return events.APIGatewayV2HTTPResponse{}, err
 	}
 	headers := make(map[string][]string)
 	for key, value := range request.Headers {
 		parts := strings.Split(value, ",")
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
+		}
 		headers[key] = parts
 	}
 	httpRequest.Header = headers
+	global.Logger.Info("Headers parsed", zap.Any("headers", headers))
 
 	var routeMatch mux.RouteMatch
 	if global.Router.Match(httpRequest, &routeMatch) {

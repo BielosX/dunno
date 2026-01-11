@@ -144,7 +144,10 @@ func RegisterFuncMatchContentType[I any, O any](router *mux.Router,
 	path, method string,
 	handler func(request *Request[I]) *Response[O],
 	contentType string) *mux.Route {
-	return RegisterFunc[I, O](router, path, method, handler).Headers("Content-Type", contentType)
+	return RegisterFunc[I, O](router, path, method, handler).MatcherFunc(func(r *http.Request, _ *mux.RouteMatch) bool {
+		v := r.Header.Get("Content-Type")
+		return strings.EqualFold(v, contentType)
+	})
 }
 
 func IsUnit(value any) bool {

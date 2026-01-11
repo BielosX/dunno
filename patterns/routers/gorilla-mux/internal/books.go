@@ -175,5 +175,6 @@ func ListBooks(r *Request[Unit]) *Response[ListBooksResponse] {
 func init() {
 	RegisterFunc(global.Router, "/books/{id}", "GET", GetBook)
 	RegisterFunc(global.Router, "/books", "GET", ListBooks)
+	RegisterFunc(global.Router, "/books", "POST", SaveBook)
 	RegisterFuncMatchContentType(global.Router, "/books", "POST", SaveBook, "application/json")
 }
