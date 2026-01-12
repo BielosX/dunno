@@ -35,11 +35,16 @@ python-powertools-build:
 python-powertools-zip: python-powertools-build
     zip -r ../lambda-arm64.zip .
 
+[working-directory: "rust-axum"]
+rust-axum-build:
+    cargo lambda build --release --output-format zip --target "aarch64-unknown-linux-gnu"
+
 [working-directory: "infra"]
-deploy: gorilla-zip python-powertools-zip
+deploy: gorilla-zip python-powertools-zip rust-axum-build
     {{tf-bin}} init && {{tf-bin}} apply -auto-approve \
         -var="gorilla_bundle_path={{justfile_directory()}}/gorilla-mux/bootstrap.zip" \
-        -var="python_powertools_path={{justfile_directory()}}/python-powertools/lambda-arm64.zip"
+        -var="python_powertools_path={{justfile_directory()}}/python-powertools/lambda-arm64.zip" \
+        -var="rust_axum_path={{justfile_directory()}}/rust-axum/target/lambda/dunno/bootstrap.zip"
 
 [working-directory: "infra"]
 destroy:
@@ -47,6 +52,7 @@ destroy:
     tmp=$(mktemp)
     {{tf-bin}} destroy -auto-approve \
         -var="gorilla_bundle_path=${tmp}" \
-        -var="python_powertools_path=${tmp}"
+        -var="python_powertools_path=${tmp}" \
+        -var="rust_axum_path=${tmp}"
     rm -f "${tmp}"
 

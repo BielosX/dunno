@@ -47,6 +47,11 @@ locals {
       runtime  = "python3.14"
       handler  = "main.handler"
     }
+    "rust-axum" = {
+      filename = var.rust_axum_path
+      runtime  = "provided.al2023"
+      handler  = "dummy"
+    }
   }
 }
 
