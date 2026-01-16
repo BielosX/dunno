@@ -24,7 +24,7 @@ func main() {
 	handler := handlerConfig.Handler
 	switch handler {
 	case apiGatewayHandler:
-		lambda.Start(api.Handler)
+		lambda.Start(api.LambdaHandler)
 	default:
 		log.Logger.Errorf("Unable to find handler: %s", handler)
 		os.Exit(1)

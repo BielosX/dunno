@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/go-chi/chi/v5"
 )
 
 type Request events.APIGatewayV2HTTPRequest
 type Response events.APIGatewayV2HTTPResponse
+type Handler func(ctx context.Context, event Request) (Response, error)
 
 type ResponseWriter struct {
 	headers       http.Header
@@ -69,4 +71,16 @@ func MapRequest(ctx context.Context, r *Request) (*http.Request, error) {
 		}
 	}
 	return request, nil
+}
+
+func NewHandler(router chi.Router) Handler {
+	return func(ctx context.Context, event Request) (Response, error) {
+		writer := NewResponseWriter()
+		request, err := MapRequest(ctx, &event)
+		if err != nil {
+			return Response{}, err
+		}
+		router.ServeHTTP(writer, request)
+		return writer.ToResponse(), nil
+	}
 }
