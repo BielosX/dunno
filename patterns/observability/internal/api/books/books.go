@@ -1,9 +1,9 @@
 package books
 
 import (
-	clients "dunno/api/aws"
-	"dunno/api/config"
-	"dunno/api/log"
+	"dunno/internal/api/config"
+	clients "dunno/internal/aws"
+	"dunno/internal/log"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,14 +18,13 @@ import (
 	"github.com/google/uuid"
 )
 
-var Router chi.Router
-
 var allowedApplicationJson = middleware.AllowContentType("application/json")
 
-func init() {
-	Router = chi.NewRouter()
-	Router.Get(fmt.Sprintf("/{bookId}"), getBookById)
-	Router.With(allowedApplicationJson).Post("/", saveBook)
+func NewRouter() chi.Router {
+	router := chi.NewRouter()
+	router.Get(fmt.Sprintf("/{bookId}"), getBookById)
+	router.With(allowedApplicationJson).Post("/", saveBook)
+	return router
 }
 
 type BookRecord struct {
@@ -69,7 +68,7 @@ func getBookById(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := clients.DynamoDbClient.GetItem(r.Context(), &dynamodb.GetItemInput{
 		ConsistentRead: aws.Bool(true),
-		TableName:      aws.String(config.AppConfig.BooksTableArn),
+		TableName:      aws.String(config.ApiConfig.BooksTableArn),
 		Key:            av,
 	})
 	if err != nil {
@@ -144,7 +143,7 @@ func saveBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = clients.DynamoDbClient.PutItem(r.Context(), &dynamodb.PutItemInput{
-		TableName: aws.String(config.AppConfig.BooksTableArn),
+		TableName: aws.String(config.ApiConfig.BooksTableArn),
 		Item:      av,
 	})
 	if err != nil {
