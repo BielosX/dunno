@@ -3,6 +3,7 @@ package main
 import (
 	"dunno/internal/api"
 	"dunno/internal/log"
+	"dunno/internal/streams"
 	"os"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -10,7 +11,8 @@ import (
 )
 
 const (
-	apiGatewayHandler = "apiGatewayHandler"
+	apiGatewayHandler      = "apiGatewayHandler"
+	dynamoDbStreamsHandler = "dynamoDbStreamsHandler"
 )
 
 type HandlerConfig struct {
@@ -29,6 +31,8 @@ func main() {
 	case apiGatewayHandler:
 		api.Init()
 		lambda.Start(api.LambdaHandler)
+	case dynamoDbStreamsHandler:
+		lambda.Start(streams.Handle)
 	default:
 		log.Logger.Errorf("Unable to find handler: %s", handler)
 		os.Exit(1)

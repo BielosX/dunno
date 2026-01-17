@@ -4,7 +4,10 @@ aws-cli := env("AWS_CLI", "aws") # awslocal for localstack
 
 export AWS_REGION := region
 
-build:
+clean:
+    rm -rf bin
+
+build: clean
     mkdir -p bin
     GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o bin/bootstrap main.go
 
