@@ -32,6 +32,7 @@ resource "aws_lambda_function" "lambda" {
   role             = aws_iam_role.role.arn
   runtime          = "provided.al2023"
   timeout          = 60
+  memory_size      = 1769 // 1vCPU
   architectures    = ["arm64"]
   filename         = var.bundle_path
   source_code_hash = filebase64sha256(var.bundle_path)
