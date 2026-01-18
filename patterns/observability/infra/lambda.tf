@@ -42,7 +42,8 @@ module "streams_lambda" {
   handler     = "dynamoDbStreamsHandler"
   name        = "${local.prefix}-dynamodb-streams"
   env_vars = {
-    LOG_LEVEL = "info"
+    LOG_LEVEL           = "info"
+    OPEN_SEARCH_ADDRESS = "https://${aws_opensearch_domain.opensearch.endpoint}"
   }
 }
 
@@ -56,6 +57,13 @@ data "aws_iam_policy_document" "streams_lambda_policy" {
       "dynamodb:ListStreams"
     ]
     resources = ["${aws_dynamodb_table.books.arn}/stream/*"]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "es:ESHttp*"
+    ]
+    resources = ["${aws_opensearch_domain.opensearch.arn}/*"]
   }
 }
 
