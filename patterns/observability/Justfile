@@ -15,17 +15,26 @@ build: clean
 zip: build
     zip bootstrap.zip bootstrap
 
-[working-directory: "infra"]
-deploy: zip
+[working-directory: "infra/lambda"]
+deploy-lambda: zip
     {{tf-bin}} init
     {{tf-bin}} apply -auto-approve -var="bundle_path={{justfile_directory()}}/bin/bootstrap.zip"
 
-[working-directory: "infra"]
-destroy:
+[working-directory: "infra/opensearch"]
+deploy-opensearch:
+    {{tf-bin}} init && {{tf-bin}} apply -auto-approve
+
+[working-directory: "infra/opensearch"]
+destroy-opensearch:
+    {{tf-bin}} destroy -auto-approve
+
+[working-directory: "infra/lambda"]
+destroy-lambda:
     #!/bin/bash -e
     tmp=$(mktemp)
     {{tf-bin}} destroy -auto-approve \
         -var="bundle_path=${tmp}"
     rm -f "${tmp}"
 
-
+destroy-all: destroy-opensearch destroy-lambda
+deploy-all: deploy-lambda deploy-opensearch

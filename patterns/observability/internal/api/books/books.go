@@ -4,25 +4,34 @@ import (
 	"dunno/internal/api/config"
 	clients "dunno/internal/aws"
 	"dunno/internal/log"
+	"dunno/internal/opensearch"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/opensearch-project/opensearch-go/v4/opensearchapi"
+	"github.com/opensearch-project/opensearch-go/v4/opensearchutil"
 )
 
 var allowedApplicationJson = middleware.AllowContentType("application/json")
 
+const publishDateLayout = time.RFC3339
+
 func NewRouter() chi.Router {
 	router := chi.NewRouter()
-	router.Get(fmt.Sprintf("/{bookId}"), getBookById)
+	router.Get("/{bookId}", getBookById)
+	router.Delete("/{bookId}", deleteBook)
+	router.Get("/", listBooks)
 	router.With(allowedApplicationJson).Post("/", saveBook)
 	return router
 }
@@ -47,6 +56,11 @@ type GetBookResponse struct {
 	PublishDate time.Time `json:"publishDate"`
 }
 
+type ListBooksResponse struct {
+	Books   []GetBookResponse `json:"books"`
+	LastKey string            `json:"lastKey,omitempty"`
+}
+
 type SaveBookRequest struct {
 	Title       string    `json:"title"`
 	ISBN        string    `json:"isbn"`
@@ -55,17 +69,20 @@ type SaveBookRequest struct {
 	PublishDate time.Time `json:"publishDate"`
 }
 
-func getBookById(w http.ResponseWriter, r *http.Request) {
-	bookId := chi.URLParam(r, "bookId")
+func bookKey(bookId string) map[string]types.AttributeValue {
 	key := map[string]string{
 		"id": bookId,
 	}
 	av, err := attributevalue.MarshalMap(&key)
 	if err != nil {
-		log.Logger.Errorf("Unable to marshall key, %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		panic(err.Error())
 	}
+	return av
+}
+
+func getBookById(w http.ResponseWriter, r *http.Request) {
+	bookId := chi.URLParam(r, "bookId")
+	av := bookKey(bookId)
 	result, err := clients.DynamoDbClient.GetItem(r.Context(), &dynamodb.GetItemInput{
 		ConsistentRead: aws.Bool(true),
 		TableName:      aws.String(config.ApiConfig.BooksTableArn),
@@ -87,7 +104,7 @@ func getBookById(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	publishDate, err := time.Parse(time.RFC3339, record.PublishDate)
+	publishDate, err := time.Parse(publishDateLayout, record.PublishDate)
 	if err != nil {
 		log.Logger.Errorf("Unable to parse publishDate, %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -124,7 +141,7 @@ func saveBook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now().Format(publishDateLayout)
 	bookId := uuid.New().String()
 	publishDate := saveRequest.PublishDate
 	record := BookRecord{
@@ -133,7 +150,7 @@ func saveBook(w http.ResponseWriter, r *http.Request) {
 		ISBN:        saveRequest.ISBN,
 		Authors:     saveRequest.Authors,
 		Pages:       saveRequest.Pages,
-		PublishDate: publishDate.Format(time.RFC3339),
+		PublishDate: publishDate.Format(publishDateLayout),
 		Created:     now,
 		Updated:     now,
 	}
@@ -166,4 +183,141 @@ func saveBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _ = w.Write(out)
+}
+
+const (
+	IndexName = "books"
+)
+
+func deleteBook(w http.ResponseWriter, r *http.Request) {
+	bookId := chi.URLParam(r, "bookId")
+	av := bookKey(bookId)
+	_, err := clients.DynamoDbClient.DeleteItem(r.Context(), &dynamodb.DeleteItemInput{
+		TableName: aws.String(config.ApiConfig.BooksTableArn),
+		Key:       av,
+	})
+	if err != nil {
+		log.Logger.Errorf("Unable to delete DynamoDB item, error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func listBooks(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	title := query.Get("title")
+	isbn := query.Get("isbn")
+	lastKey := query.Get("lastKey")
+	authors := query["author"]
+	size := int32(50)
+	sizeParam := query.Get("size")
+	if sizeParam != "" {
+		p, err := strconv.ParseInt(sizeParam, 10, 32)
+		if err != nil || p > 50 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		size = int32(p)
+	}
+	request := SearchRequest{
+		Size: size,
+		Sort: []map[string]any{
+			{"id": "asc"},
+		},
+		SearchAfter: []string{},
+		Query: QueryPayload{
+			Bool: BoolPayload{
+				Filter: []map[string]any{},
+			},
+		},
+	}
+	if lastKey != "" {
+		request.SearchAfter = []string{lastKey}
+	}
+	if title != "" {
+		request.Query.Bool.appendPrefixFilter(map[string]any{
+			"title": strings.ToLower(title),
+		})
+	}
+	if isbn != "" {
+		request.Query.Bool.appendTermFilter(map[string]any{
+			"isbn": isbn,
+		})
+	}
+	if len(authors) > 0 {
+		lowerAuthors := make([]string, len(authors))
+		for i, v := range authors {
+			lowerAuthors[i] = strings.ToLower(v)
+		}
+		request.Query.Bool.appendTermFilter(map[string]any{
+			"authors": lowerAuthors,
+		})
+	}
+	resp, err := opensearch.Client.Search(r.Context(), &opensearchapi.SearchReq{
+		Indices: []string{IndexName},
+		Body:    opensearchutil.NewJSONReader(&request),
+	})
+	if err != nil {
+		log.Logger.Errorf("OpenSearch query failed, error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// TODO: add metric
+	log.Logger.Infof("Search finished, took: %d ms", resp.Took)
+	resultLastKey := ""
+	hits := resp.Hits.Hits
+	lenHits := len(hits)
+	keys := make([]map[string]types.AttributeValue, lenHits)
+	for i, v := range hits {
+		if i == lenHits-1 && int32(lenHits) == size {
+			resultLastKey = v.Sort[0].(string)
+		}
+		keys[i] = bookKey(v.ID)
+	}
+	lenKeys := len(keys)
+	log.Logger.Infof("Found %d index entries", lenKeys)
+	var bookRecords []BookRecord
+	if lenKeys > 0 {
+		out, err := clients.DynamoDbClient.BatchGetItem(r.Context(), &dynamodb.BatchGetItemInput{
+			RequestItems: map[string]types.KeysAndAttributes{
+				config.ApiConfig.BooksTableArn: {
+					Keys: keys,
+				},
+			},
+		})
+		if err != nil {
+			log.Logger.Errorf("DynamoDB BatchGetItem failed, error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		tableEntries, ok := out.Responses[config.ApiConfig.BooksTableArn]
+		if ok {
+			_ = attributevalue.UnmarshalListOfMaps(tableEntries, &bookRecords)
+		} else {
+			log.Logger.Infof("Nothing found for table %s", config.ApiConfig.BooksTableArn)
+		}
+	}
+	books := make([]GetBookResponse, len(bookRecords))
+	for i, v := range bookRecords {
+		publishDate, _ := time.Parse(publishDateLayout, v.PublishDate)
+		books[i] = GetBookResponse{
+			Id:          v.Id,
+			Title:       v.Title,
+			ISBN:        v.ISBN,
+			Authors:     v.Authors,
+			Pages:       v.Pages,
+			PublishDate: publishDate,
+		}
+	}
+	booksResponse := ListBooksResponse{
+		Books:   books,
+		LastKey: resultLastKey,
+	}
+	response, err := json.Marshal(&booksResponse)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	_, _ = w.Write(response)
 }

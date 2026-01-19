@@ -7,9 +7,17 @@ data "aws_iam_policy_document" "api_lambda_policy" {
     effect = "Allow"
     actions = [
       "dynamodb:GetItem",
-      "dynamodb:PutItem"
+      "dynamodb:PutItem",
+      "dynamodb:BatchGetItem",
     ]
     resources = [aws_dynamodb_table.books.arn]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "es:ESHttp*",
+    ]
+    resources = ["${aws_opensearch_domain.opensearch.arn}/*"]
   }
 }
 
@@ -19,8 +27,9 @@ module "api_lambda" {
   handler     = "apiGatewayHandler"
   name        = "${local.prefix}-api"
   env_vars = {
-    BOOKS_TABLE_ARN = aws_dynamodb_table.books.arn
-    LOG_LEVEL       = "info"
+    BOOKS_TABLE_ARN     = aws_dynamodb_table.books.arn
+    OPEN_SEARCH_ADDRESS = "https://${aws_opensearch_domain.opensearch.endpoint}"
+    LOG_LEVEL           = "info"
   }
 }
 

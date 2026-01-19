@@ -5,6 +5,7 @@ import (
 	"dunno/internal/log"
 	"dunno/internal/opensearch"
 	"errors"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/opensearch-project/opensearch-go/v4/opensearchapi"
@@ -12,18 +13,10 @@ import (
 )
 
 type BookIndexRecord struct {
-	Title   string
-	ISBN    string
-	Authors []string
-}
-
-func stringList(av events.DynamoDBAttributeValue) []string {
-	l := av.List()
-	result := make([]string, len(l))
-	for i, v := range l {
-		result[i] = v.String()
-	}
-	return result
+	Id      string   `json:"id"`
+	Title   string   `json:"title"`
+	ISBN    string   `json:"isbn"`
+	Authors []string `json:"authors"`
 }
 
 const (
@@ -49,10 +42,16 @@ func Handle(ctx context.Context, event events.DynamoDBEvent) error {
 				return errors.New("NewImage field expected")
 			}
 			bookId := newImage["id"].String()
+			authors := newImage["authors"].List()
+			lowerAuthors := make([]string, len(authors))
+			for i, a := range authors {
+				lowerAuthors[i] = strings.ToLower(a.String())
+			}
 			indexRecord := BookIndexRecord{
-				Title:   newImage["title"].String(),
+				Id:      bookId,
+				Title:   strings.ToLower(newImage["title"].String()),
 				ISBN:    newImage["isbn"].String(),
-				Authors: stringList(newImage["authors"]),
+				Authors: lowerAuthors,
 			}
 			log.Logger.Infow("BookIndexRecord created", "id", bookId, "record", indexRecord)
 			resp, err := opensearch.Client.Index(ctx, opensearchapi.IndexReq{
