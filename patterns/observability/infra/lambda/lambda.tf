@@ -19,6 +19,13 @@ data "aws_iam_policy_document" "api_lambda_policy" {
     ]
     resources = ["${aws_opensearch_domain.opensearch.arn}/*"]
   }
+  statement {
+    effect = "Allow"
+    actions = [
+      "cloudwatch:PutMetricData"
+    ]
+    resources = ["*"]
+  }
 }
 
 module "api_lambda" {
