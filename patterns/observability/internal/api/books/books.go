@@ -14,6 +14,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/go-chi/chi/v5"
@@ -232,15 +234,19 @@ func listBooks(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	}
+	var metricDimension []string
 	if lastKey != "" {
+		metricDimension = append(metricDimension, "lastKey")
 		request.SearchAfter = []string{lastKey}
 	}
 	if title != "" {
+		metricDimension = append(metricDimension, "title")
 		request.Query.Bool.appendPrefixFilter(map[string]any{
 			"title": strings.ToLower(title),
 		})
 	}
 	if isbn != "" {
+		metricDimension = append(metricDimension, "isbn")
 		request.Query.Bool.appendTermFilter(map[string]any{
 			"isbn": isbn,
 		})
@@ -250,6 +256,7 @@ func listBooks(w http.ResponseWriter, r *http.Request) {
 		for i, v := range authors {
 			lowerAuthors[i] = strings.ToLower(v)
 		}
+		metricDimension = append(metricDimension, "authors")
 		request.Query.Bool.appendTermFilter(map[string]any{
 			"authors": lowerAuthors,
 		})
@@ -263,7 +270,27 @@ func listBooks(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	// TODO: add metric
+	_, err = clients.CloudWatchClient.PutMetricData(r.Context(), &cloudwatch.PutMetricDataInput{
+		Namespace: aws.String("dunno"),
+		MetricData: []cwtypes.MetricDatum{
+			{
+				MetricName: aws.String("openSearchQueryDuration"),
+				Unit:       cwtypes.StandardUnitMilliseconds,
+				Value:      aws.Float64(float64(resp.Took)),
+				Dimensions: []cwtypes.Dimension{
+					{
+						Name:  aws.String("params"),
+						Value: aws.String(strings.Join(metricDimension, ",")),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Logger.Errorf("PutMetricData failed, error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	log.Logger.Infof("Search finished, took: %d ms", resp.Took)
 	resultLastKey := ""
 	hits := resp.Hits.Hits
