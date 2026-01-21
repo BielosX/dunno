@@ -271,7 +271,7 @@ func listBooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = clients.CloudWatchClient.PutMetricData(r.Context(), &cloudwatch.PutMetricDataInput{
-		Namespace: aws.String("dunno"),
+		Namespace: aws.String(config.ApiConfig.MetricsNamespace),
 		MetricData: []cwtypes.MetricDatum{
 			{
 				MetricName: aws.String("openSearchQueryDuration"),

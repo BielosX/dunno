@@ -14,7 +14,7 @@ func Init() {
 	config.Load()
 	rootRouter := chi.NewRouter()
 	rootRouter.Use(middleware.Logger)
-	rootRouter.Use(endpointDurationMiddleware("dunno", "requestDuration"))
+	rootRouter.Use(endpointDurationMiddleware(config.ApiConfig.MetricsNamespace, "requestDuration"))
 	rootRouter.Mount("/books", books.NewRouter())
 	LambdaHandler = NewHandler(rootRouter)
 }

@@ -5,7 +5,8 @@ import (
 )
 
 type Config struct {
-	BooksTableArn string `env:"BOOKS_TABLE_ARN"`
+	BooksTableArn    string `env:"BOOKS_TABLE_ARN"`
+	MetricsNamespace string `env:"METRICS_NAMESPACE"`
 }
 
 var ApiConfig Config

@@ -37,6 +37,7 @@ module "api_lambda" {
     BOOKS_TABLE_ARN     = aws_dynamodb_table.books.arn
     OPEN_SEARCH_ADDRESS = "https://${aws_opensearch_domain.opensearch.endpoint}"
     LOG_LEVEL           = "info"
+    METRICS_NAMESPACE   = local.prefix
   }
 }
 
